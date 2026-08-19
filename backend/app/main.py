@@ -25,10 +25,11 @@ app = FastAPI(
 )
 
 # Vite 开发代理会让浏览器保持同源；保留显式来源以支持直接调试 API。
+# 允许全域 CORS 请求（支持 Netlify 等前端跨域调用）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
