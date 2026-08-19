@@ -141,6 +141,10 @@ class MockFixtureApiService implements FixtureApi {
     await sleep(100);
   }
 
+  async revokeDrcOverride(_id: string, _issueId: string): Promise<void> {
+    await sleep(100);
+  }
+
   async getProductionGate(_id: string): Promise<ProductionGateResult> {
     return {
       blocking_reviews: 0,

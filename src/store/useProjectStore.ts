@@ -212,6 +212,7 @@ export interface ProjectState {
   locateIssue: (issue: DesignIssue) => void;
   confirmIssue: (issueId: string) => void;
   overrideDrc: (issueId: string, operator?: string, reason?: string) => Promise<void>;
+  revokeDrcOverride: (issueId: string) => Promise<void>;
   confirmLayers: (layers: GerberLayer[]) => Promise<void>;
 
   toggleParameterDrawer: (open?: boolean) => void;
@@ -522,10 +523,41 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           ),
         },
       });
+      await get().hydrateJob(job.id);
       get().showToast(`DRC 问题已放行确认: ${issueId}`, "success");
     } catch (error) {
       get().confirmIssue(issueId);
       get().showToast(`已本地标记确认: ${issueId}`, "info");
+    }
+  },
+
+  revokeDrcOverride: async (issueId: string) => {
+    const job = get().currentProject;
+    if (!job) {
+      set({
+        fixtureResult: {
+          ...get().fixtureResult,
+          issues: get().fixtureResult.issues.map((issue) =>
+            issue.id === issueId ? { ...issue, confirmed: false } : issue
+          ),
+        },
+      });
+      return;
+    }
+    try {
+      await fixtureApi.revokeDrcOverride(job.id, issueId);
+      set({
+        fixtureResult: {
+          ...get().fixtureResult,
+          issues: get().fixtureResult.issues.map((issue) =>
+            issue.id === issueId ? { ...issue, confirmed: false } : issue
+          ),
+        },
+      });
+      await get().hydrateJob(job.id);
+      get().showToast(`DRC 放行已撤销: ${issueId}`, "info");
+    } catch (error) {
+      get().showToast(`撤销失败: ${(error as Error).message}`, "error");
     }
   },
 

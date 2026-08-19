@@ -27,6 +27,7 @@ export interface FixtureApi {
 
   // DRC Override & Production Gate
   overrideDrc(id: string, issueId: string, operator: string, reason: string): Promise<void>;
+  revokeDrcOverride(id: string, issueId: string): Promise<void>;
   getProductionGate(id: string): Promise<ProductionGateResult>;
   downloadPreviewDxf(id: string): Promise<Blob>;
 

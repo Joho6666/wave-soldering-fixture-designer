@@ -380,21 +380,48 @@ def export_fixture_svg(layers_data: Dict[str, Any], output_path: str) -> str:
     return output_path
 
 
-def _polygon_to_svg_path(geometry, color: str, title: str = '') -> str:
-    """Convert Polygon/MultiPolygon including cutouts to SVG paths."""
-    if geometry is None or geometry.is_empty:
-        return ''
-    polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
-    if any(polygon.geom_type != "Polygon" for polygon in polygons):
-        raise TypeError(f"SVG 不支持几何类型 {geometry.geom_type}")
-    parts = []
-    for polygon in polygons:
-        rings = [polygon.exterior, *polygon.interiors]
+def _extract_svg_subpaths(geom) -> list[str]:
+    if geom is None or geom.is_empty:
+        return []
+    gtype = geom.geom_type
+    subpaths = []
+    if gtype == "Polygon":
+        rings = [geom.exterior, *geom.interiors]
         for ring in rings:
             coords = list(ring.coords)
-            parts.append(f"M {coords[0][0]},{coords[0][1]} " + " ".join(f"L {x},{y}" for x, y in coords[1:]) + " Z")
+            if coords:
+                subpaths.append(f"M {coords[0][0]:.3f},{coords[0][1]:.3f} " + " ".join(f"L {x:.3f},{y:.3f}" for x, y in coords[1:]) + " Z")
+    elif gtype == "MultiPolygon":
+        for p in geom.geoms:
+            subpaths.extend(_extract_svg_subpaths(p))
+    elif gtype == "LineString":
+        coords = list(geom.coords)
+        if coords:
+            subpaths.append(f"M {coords[0][0]:.3f},{coords[0][1]:.3f} " + " ".join(f"L {x:.3f},{y:.3f}" for x, y in coords[1:]))
+    elif gtype == "MultiLineString":
+        for ls in geom.geoms:
+            subpaths.extend(_extract_svg_subpaths(ls))
+    elif gtype == "Point":
+        subpaths.append(f"M {geom.x - 0.5:.3f},{geom.y:.3f} A 0.5 0.5 0 1 0 {geom.x + 0.5:.3f} {geom.y:.3f} A 0.5 0.5 0 1 0 {geom.x - 0.5:.3f} {geom.y:.3f} Z")
+    elif gtype == "MultiPoint":
+        for pt in geom.geoms:
+            subpaths.extend(_extract_svg_subpaths(pt))
+    elif gtype == "GeometryCollection":
+        for sub in geom.geoms:
+            subpaths.extend(_extract_svg_subpaths(sub))
+    return subpaths
+
+
+def _polygon_to_svg_path(geometry, color: str, title: str = '') -> str:
+    """Convert any Shapely geometry (Polygon, MultiPolygon, LineString, GeometryCollection) to SVG path."""
+    if geometry is None or geometry.is_empty:
+        return ''
+    subpaths = _extract_svg_subpaths(geometry)
+    if not subpaths:
+        return ''
+    d_attr = ' '.join(subpaths)
     return (
-        f'<path d="{" ".join(parts)}" fill="none" fill-rule="evenodd" '
+        f'<path d="{d_attr}" fill="none" fill-rule="evenodd" '
         f'stroke="{color}" stroke-width="0.5" opacity="0.85"><title>{title}</title></path>'
     )
 

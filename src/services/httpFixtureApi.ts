@@ -134,6 +134,12 @@ class HttpFixtureApiService implements FixtureApi {
     });
   }
 
+  async revokeDrcOverride(id: string, issueId: string): Promise<void> {
+    await this.request<void>(`/api/jobs/${id}/drc/${issueId}/override`, {
+      method: "DELETE",
+    });
+  }
+
   async getProductionGate(id: string): Promise<ProductionGateResult> {
     return this.request<ProductionGateResult>(`/api/jobs/${id}/production-gate`);
   }

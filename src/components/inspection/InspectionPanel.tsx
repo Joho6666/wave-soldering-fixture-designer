@@ -9,6 +9,7 @@ export const InspectionPanel: React.FC = () => {
     fixtureResult,
     locateIssue,
     overrideDrc,
+    revokeDrcOverride,
     regenerate,
     previewSvg,
     resetCadView,
@@ -164,10 +165,19 @@ export const InspectionPanel: React.FC = () => {
                         </button>
 
                         {issue.confirmed ? (
-                          <span className="text-[10px] font-data-mono text-[#4ade80] flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-[12px]">verified</span>
-                            已放行
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-data-mono text-[#4ade80] flex items-center gap-0.5">
+                              <span className="material-symbols-outlined text-[12px]">verified</span>
+                              已放行
+                            </span>
+                            <button
+                              onClick={() => revokeDrcOverride(issue.id)}
+                              className="text-[10px] text-on-surface-variant hover:text-rose-400 underline transition-colors"
+                              title="撤销工程师放行确认"
+                            >
+                              撤销
+                            </button>
+                          </div>
                         ) : (
                           <button
                             onClick={() => overrideDrc(issue.id)}

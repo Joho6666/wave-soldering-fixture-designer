@@ -553,11 +553,25 @@ class FixtureGenerator:
             })
             return [], review_items
 
-        from shapely.geometry import GeometryCollection
+        from shapely.geometry import GeometryCollection, LineString, MultiLineString
+        polygons: list[Polygon] = []
         if isinstance(top_silk, (Polygon, MultiPolygon)):
             polygons = list(top_silk.geoms) if isinstance(top_silk, MultiPolygon) else [top_silk]
         elif isinstance(top_silk, GeometryCollection):
-            polygons = [g for g in top_silk.geoms if isinstance(g, Polygon) and g.area > 2.0]
+            for g in top_silk.geoms:
+                if isinstance(g, Polygon):
+                    polygons.append(g)
+                elif isinstance(g, MultiPolygon):
+                    polygons.extend(list(g.geoms))
+                elif isinstance(g, (LineString, MultiLineString)):
+                    buf = g.buffer(0.1)
+                    if isinstance(buf, Polygon):
+                        polygons.append(buf)
+                    elif isinstance(buf, MultiPolygon):
+                        polygons.extend(list(buf.geoms))
+        elif isinstance(top_silk, (LineString, MultiLineString)):
+            buf = top_silk.buffer(0.1)
+            polygons = list(buf.geoms) if isinstance(buf, MultiPolygon) else [buf]
         else:
             polygons = []
 
