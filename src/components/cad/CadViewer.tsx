@@ -32,24 +32,28 @@ export const CadViewer: React.FC = () => {
     if (!svgContainerRef.current) return;
     const drillGroup = svgContainerRef.current.querySelector("#pcb-drill");
     const candGroup = svgContainerRef.current.querySelector("#locating-pin-candidates");
+    const pinsGroup = svgContainerRef.current.querySelector("#locating-pins");
 
     const handleClick = (e: Event) => {
       const target = e.target as SVGElement;
       if (target && target.tagName.toLowerCase() === "circle") {
-        const id = target.id || target.getAttribute("id");
-        if (id) {
+        const rawId = target.id || target.getAttribute("id");
+        if (rawId) {
           e.stopPropagation();
-          toggleManualPin(id);
+          const cleanId = rawId.replace(/^pin-cand-/, "").replace(/^pin-/, "");
+          toggleManualPin(cleanId);
         }
       }
     };
 
     drillGroup?.addEventListener("click", handleClick);
     candGroup?.addEventListener("click", handleClick);
+    pinsGroup?.addEventListener("click", handleClick);
 
     return () => {
       drillGroup?.removeEventListener("click", handleClick);
       candGroup?.removeEventListener("click", handleClick);
+      pinsGroup?.removeEventListener("click", handleClick);
     };
   }, [previewSvg, toggleManualPin]);
 

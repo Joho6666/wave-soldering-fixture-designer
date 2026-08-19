@@ -312,18 +312,21 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   toggleManualPin: async (drillId: string) => {
     const job = get().currentProject;
     if (!job) return;
+    const cleanId = drillId.replace(/^pin-cand-/, "").replace(/^pin-/, "");
     const currentPins = [...get().manualLocatingPins];
-    const index = currentPins.indexOf(drillId);
+    const index = currentPins.findIndex(
+      (p) => p === cleanId || p.replace(/^pin-cand-/, "").replace(/^pin-/, "") === cleanId
+    );
     if (index >= 0) {
       currentPins.splice(index, 1);
     } else {
-      currentPins.push(drillId);
+      currentPins.push(cleanId);
     }
     set({ manualLocatingPins: currentPins });
     try {
       await fixtureApi.regenerate(job.id, get().parameters, currentPins);
       await get().hydrateJob(job.id);
-      get().showToast(`定位销设置已更新: ${drillId}`, "success");
+      get().showToast(`定位销设置已更新: ${cleanId}`, "success");
     } catch (e) {
       get().showToast(`更新定位销失败: ${(e as Error).message}`, "error");
     }
