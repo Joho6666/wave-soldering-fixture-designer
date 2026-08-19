@@ -204,15 +204,24 @@ class GerberParser:
                 for info in infos:
                     if info.is_dir():
                         continue
-                    normalized = PurePosixPath(info.filename.replace("\\", "/"))
+                    raw_name = info.filename
+                    if not (info.flag_bits & 0x800):
+                        try:
+                            raw_name = raw_name.encode("cp437").decode("gbk")
+                        except (UnicodeDecodeError, UnicodeEncodeError):
+                            try:
+                                raw_name = raw_name.encode("cp437").decode("utf-8")
+                            except (UnicodeDecodeError, UnicodeEncodeError):
+                                pass
+                    normalized = PurePosixPath(raw_name.replace("\\", "/"))
                     if normalized.is_absolute() or ".." in normalized.parts:
-                        raise GerberParseError("ZIP_INVALID", f"ZIP 包含不安全路径: {info.filename}")
+                        raise GerberParseError("ZIP_INVALID", f"ZIP 包含不安全路径: {raw_name}")
                     total_bytes += info.file_size
                     if total_bytes > MAX_UNCOMPRESSED_BYTES:
                         raise GerberParseError("ZIP_INVALID", "ZIP 解压后体积超出安全限制。")
                     
                     data = zf.read(info.filename)
-                    members.append((info.filename, data))
+                    members.append((raw_name, data))
                 return members
         except BadZipFile as exc:
             raise GerberParseError("INVALID_ZIP", f"ZIP 文件损坏或格式错误: {exc}") from exc
@@ -279,20 +288,20 @@ class GerberParser:
         if suffix in {".gbo", ".pls", ".ssb"}:
             return "bottom_silkscreen", 0.92, "标准底层丝印扩展名"
 
-        # 3. Filename keyword patterns
-        if any(k in name for k in ["outline", "boardoutline", "profile", "edge", "border", "gm1", "gko"]):
-            return "board_outline", 0.90, "文件名匹配 PCB 外形关键词"
-        if any(k in name for k in ["gtl", "top_copper", "topcopper", "copper_top", "f_cu", "top.gbr"]):
+        # 3. Filename keyword patterns (English and Chinese EDA standard names)
+        if any(k in name for k in ["outline", "boardoutline", "profile", "edge", "border", "gm1", "gko", "板框", "外形", "机械1", "边框"]):
+            return "board_outline", 0.90, "文件名匹配 PCB 外形/板框关键词"
+        if any(k in name for k in ["gtl", "top_copper", "topcopper", "copper_top", "f_cu", "top.gbr", "顶层线路", "顶层铜箔", "顶层铜皮", "顶层走线", "正面线路"]):
             return "top_copper", 0.85, "文件名匹配顶层铜皮关键词"
-        if any(k in name for k in ["gbl", "bot_copper", "bottomcopper", "copper_bot", "b_cu", "bottom.gbr"]):
+        if any(k in name for k in ["gbl", "bot_copper", "bottomcopper", "copper_bot", "b_cu", "bottom.gbr", "底层线路", "底层铜箔", "底层铜皮", "底层走线", "背面线路"]):
             return "bottom_copper", 0.85, "文件名匹配底层铜皮关键词"
-        if any(k in name for k in ["gts", "top_mask", "topsoldermask", "mask_top", "f_mask"]):
+        if any(k in name for k in ["gts", "top_mask", "topsoldermask", "mask_top", "f_mask", "顶层阻焊", "正面阻焊", "顶层绿油", "正面绿油"]):
             return "top_soldermask", 0.85, "文件名匹配顶层阻焊关键词"
-        if any(k in name for k in ["gbs", "bot_mask", "bottomsoldermask", "mask_bot", "b_mask"]):
+        if any(k in name for k in ["gbs", "bot_mask", "bottomsoldermask", "mask_bot", "b_mask", "底层阻焊", "背面阻焊", "底层绿油", "背面绿油"]):
             return "bottom_soldermask", 0.85, "文件名匹配底层阻焊关键词"
-        if any(k in name for k in ["gto", "top_silk", "topsilkscreen", "silk_top", "f_silk"]):
+        if any(k in name for k in ["gto", "top_silk", "topsilkscreen", "silk_top", "f_silk", "顶层丝印", "正面丝印", "顶层字符", "正面字符"]):
             return "top_silkscreen", 0.85, "文件名匹配顶层丝印关键词"
-        if any(k in name for k in ["gbo", "bot_silk", "bottomsilkscreen", "silk_bot", "b_silk"]):
+        if any(k in name for k in ["gbo", "bot_silk", "bottomsilkscreen", "silk_bot", "b_silk", "底层丝印", "背面丝印", "底层字符", "背面字符"]):
             return "bottom_silkscreen", 0.85, "文件名匹配底层丝印关键词"
 
         # Unclear layer, assign low confidence
