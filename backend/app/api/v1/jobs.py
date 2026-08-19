@@ -61,7 +61,7 @@ async def create_job(
         progress=5,
         current_step="已接收文件，正在解压并准备解析",
         file_path=str(file_path),
-        parameters=FixtureParameters().dict(),
+        parameters=FixtureParameters().model_dump(),
         logs=[{
             "time": datetime.now().strftime("%H:%M:%S"),
             "level": "info",
@@ -132,7 +132,7 @@ async def confirm_layers(
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
     
-    confirmed_list = [layer.dict() for layer in request.layers]
+    confirmed_list = [layer.model_dump() for layer in request.layers]
     job.confirmed_layers = confirmed_list
     
     # 持久化到 job 目录下的 layer_mapping.json
@@ -275,7 +275,7 @@ async def update_parameters(
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
     
-    job.parameters = parameters.dict()
+    job.parameters = parameters.model_dump()
     add_log(job, "info", "工程参数已更新")
     db.commit()
     return {"status": "ok", "message": "参数更新成功"}
@@ -293,7 +293,7 @@ async def regenerate(
         raise HTTPException(status_code=404, detail="任务不存在")
     
     if request and request.parameters:
-        job.parameters = request.parameters.dict()
+        job.parameters = request.parameters.model_dump()
     
     manual_pins = request.manualLocatingPins if request and request.manualLocatingPins is not None else (job.result_data or {}).get("manualLocatingPins")
 
@@ -476,7 +476,7 @@ async def override_drc(
     request: DrcOverrideRequest,
     db: Session = Depends(get_db),
 ):
-    """工程师对特定 DRC 问题做放行确认。"""
+    """工程师对特定 DRC 问题做放行确认。支持对已过期的放行记录进行重新激活确认。"""
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -495,8 +495,15 @@ async def override_drc(
         raise HTTPException(status_code=404, detail=f"DRC issue {issue_id} 不存在")
 
     overrides = list(job.result_data.get("drcOverrides", []))
-    if any(o["issueId"] == issue_id for o in overrides):
-        raise HTTPException(status_code=409, detail=f"DRC issue {issue_id} 已被放行")
+    current_sha = job.result_data.get("geometrySha256")
+
+    # 检查是否已存在 active 且 SHA 一致的放行记录
+    for o in overrides:
+        if o["issueId"] == issue_id and o.get("status") == "active" and o.get("geometrySha256") == current_sha and current_sha is not None:
+            raise HTTPException(status_code=409, detail=f"DRC issue {issue_id} 已经是活跃放行状态")
+
+    # 移除旧的同 issueId 记录（覆盖已过期或被撤销的记录）
+    overrides = [o for o in overrides if o["issueId"] != issue_id]
 
     override_record = {
         "issueId": issue_id,
@@ -504,7 +511,7 @@ async def override_drc(
         "reason": request.reason,
         "timestamp": datetime.now().isoformat(),
         "originalSeverity": original_severity,
-        "geometrySha256": job.result_data.get("geometrySha256"),
+        "geometrySha256": current_sha,
         "status": "active",
     }
     overrides.append(override_record)
@@ -515,6 +522,33 @@ async def override_drc(
     db.commit()
 
     return {"status": "ok", "override": override_record}
+
+
+@router.delete("/jobs/{job_id}/drc/{issue_id}/override")
+async def revoke_drc_override(
+    job_id: str,
+    issue_id: str,
+    db: Session = Depends(get_db),
+):
+    """撤销对特定 DRC 问题的放行确认。"""
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if not job.result_data:
+        raise HTTPException(status_code=404, detail="结果数据不存在")
+
+    overrides = list(job.result_data.get("drcOverrides", []))
+    existing = [o for o in overrides if o["issueId"] == issue_id]
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"DRC issue {issue_id} 未被放行")
+
+    overrides = [o for o in overrides if o["issueId"] != issue_id]
+    updated = {**job.result_data, "drcOverrides": overrides}
+    job.result_data = updated
+    add_log(job, "info", f"DRC [{issue_id}] 工程师放行已撤销")
+    db.commit()
+
+    return {"status": "ok", "message": f"DRC issue {issue_id} 放行已撤销"}
 
 
 @router.get("/jobs/{job_id}/production-gate", response_model=ProductionGateResult)

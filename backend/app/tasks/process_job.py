@@ -91,6 +91,8 @@ def process_gerber_job(
             return
 
         pcb_geom = analysis_result.pop("pcb_geometry")
+        pcb_geom.bot_components = detect_bot_components(pcb_geom)
+        pcb_geom.through_hole_clusters = detect_through_hole_clusters(pcb_geom)
         job.analysis_data = analysis_result
         job.progress = 40
         job.current_step = f"PCB 外形闭合成功 ({pcb_geom.width:.1f}×{pcb_geom.height:.1f}mm), 提取真实钻孔 {len(pcb_geom.holes)} 个"
@@ -146,8 +148,18 @@ def process_gerber_job(
         job.progress = 100
         job.current_step = f"治具出图完成 ({job.status}) - DRC 问题: {len(fixture_data.get('issues', []))}, 待审核项: {len(pending_reviews)}"
         
+        ocr_refdes = []
+        if ENABLE_OCR:
+            try:
+                from app.services.ocr.refdes_ocr import extract_refdes, is_ocr_available
+                if is_ocr_available():
+                    ocr_refdes = [r.to_dict() for r in extract_refdes(pcb_geom.top_silkscreen, pcb_geom.outline.bounds)]
+            except Exception as ocr_err:
+                add_log(job, "warning", f"OCR 提取异常 (已跳过): {ocr_err}")
+
         existing_overrides = (job.result_data or {}).get("drcOverrides", [])
         job.result_data = {
+            "ocrRefDesResults": ocr_refdes,
             "fixtureWidth": fixture_data["fixtureWidth"],
             "fixtureHeight": fixture_data["fixtureHeight"],
             "featureSummary": fixture_data["featureSummary"],

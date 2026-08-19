@@ -15,7 +15,7 @@ def _mock_job(candidates=None):
     job.status = "completed"
     job.name = "test.zip"
     job.file_path = "/tmp/test.zip"
-    job.parameters = FixtureParameters().dict()
+    job.parameters = FixtureParameters().model_dump()
     job.result_data = {
         "locatingCandidates": candidates or [
             {"id": "pin-cand-d1", "drillId": "d1", "x": 5.0, "y": 5.0,

@@ -603,20 +603,23 @@ class FixtureGenerator:
         return clips, review_items
     def _geometry_digest(self, fixture: FixtureGeometry) -> str:
         h = hashlib.sha256()
-        h.update(to_wkb(normalize(fixture.body), hex=False))
-        h.update(to_wkb(normalize(fixture.sink_region), hex=False))
-        for pin in fixture.locating_pins:
+        h.update(to_wkb(normalize(make_valid(fixture.body)), hex=False))
+        h.update(to_wkb(normalize(make_valid(fixture.sink_region)), hex=False))
+        sorted_pins = sorted(fixture.locating_pins, key=lambda p: (p['x'], p['y']))
+        for pin in sorted_pins:
             h.update(f"{pin['x']}:{pin['y']}:{pin['diameter']}".encode("utf-8"))
-        for clip in fixture.clamp_holes:
+        sorted_clamps = sorted(fixture.clamp_holes, key=lambda c: (c['x'], c['y']))
+        for clip in sorted_clamps:
             h.update(f"{clip['x']}:{clip['y']}:{clip['diameter']}".encode("utf-8"))
-        for sp in getattr(fixture, "spring_clip_holes", []):
+        sorted_springs = sorted(getattr(fixture, "spring_clip_holes", []), key=lambda s: (s['x'], s['y']))
+        for sp in sorted_springs:
             h.update(f"{sp['x']}:{sp['y']}:{sp['diameter']}".encode("utf-8"))
-        for kz in fixture.keepout_regions:
-            if not kz.is_empty:
-                h.update(to_wkb(normalize(kz), hex=False))
-        for sw in fixture.solder_regions:
-            if not sw.is_empty:
-                h.update(to_wkb(normalize(sw), hex=False))
+        sorted_keepouts = sorted([kz for kz in fixture.keepout_regions if not kz.is_empty], key=lambda k: (k.centroid.x, k.centroid.y))
+        for kz in sorted_keepouts:
+            h.update(to_wkb(normalize(make_valid(kz)), hex=False))
+        sorted_solders = sorted([sw for sw in fixture.solder_regions if not sw.is_empty], key=lambda s: (s.centroid.x, s.centroid.y))
+        for sw in sorted_solders:
+            h.update(to_wkb(normalize(make_valid(sw)), hex=False))
         return h.hexdigest()
 
 

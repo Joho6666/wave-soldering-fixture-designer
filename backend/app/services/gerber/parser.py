@@ -404,9 +404,16 @@ class GerberParser:
         if hasattr(gerber, "primitives"):
             for prim in gerber.primitives():
                 if isinstance(prim, Circle):
-                    geoms.append(Point(prim.x, prim.y).buffer(prim.diameter(MM) / 2))
+                    if hasattr(prim, "r"):
+                        r = float(prim.r)
+                    elif hasattr(prim, "diameter") and callable(prim.diameter):
+                        r = float(prim.diameter(MM)) / 2
+                    else:
+                        r = 0.5
+                    geoms.append(Point(prim.x, prim.y).buffer(r))
                 elif isinstance(prim, Rectangle):
-                    w, h = prim.width(MM), prim.height(MM)
+                    w = float(prim.width(MM)) if hasattr(prim, "width") and callable(prim.width) else float(getattr(prim, "w", getattr(prim, "width", 1.0)))
+                    h = float(prim.height(MM)) if hasattr(prim, "height") and callable(prim.height) else float(getattr(prim, "h", getattr(prim, "height", 1.0)))
                     x, y = prim.x, prim.y
                     geoms.append(Polygon([
                         (x - w / 2, y - h / 2),
@@ -416,13 +423,24 @@ class GerberParser:
                     ]))
                 elif isinstance(prim, ArcPoly):
                     try:
-                        coords = list(prim.to_polygon(MM))
+                        coords = list(prim.to_polygon(MM) if callable(getattr(prim, "to_polygon", None)) else prim.to_polygon())
                         if len(coords) >= 3:
                             geoms.append(Polygon(coords))
                     except Exception:
                         pass
                 elif isinstance(prim, PrimitiveLine):
-                    geoms.append(LineString([(prim.x1, prim.y1), (prim.x2, prim.y2)]).buffer(prim.aperture.diameter(MM) / 2 if hasattr(prim, "aperture") else 0.1))
+                    w = getattr(prim, "width", 0.2)
+                    w_val = float(w(MM)) if callable(w) else float(w)
+                    geoms.append(LineString([(prim.x1, prim.y1), (prim.x2, prim.y2)]).buffer(w_val / 2))
+                elif isinstance(prim, PrimitiveArc):
+                    try:
+                        coords = approximate_arc(prim.x1, prim.y1, prim.x2, prim.y2, prim.cx, prim.cy, prim.clockwise)
+                        if len(coords) >= 2:
+                            w = getattr(prim, "width", 0.2)
+                            w_val = float(w(MM)) if callable(w) else float(w)
+                            geoms.append(LineString(coords).buffer(w_val / 2))
+                    except Exception:
+                        pass
         
         if not geoms:
             return GeometryCollection()

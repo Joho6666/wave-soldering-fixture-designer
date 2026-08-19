@@ -2,9 +2,37 @@ import React from "react";
 import { useProjectStore } from "../../store/useProjectStore";
 
 export const ReviewBanner: React.FC = () => {
-  const { jobStatus, fixtureResult, acceptReview, rejectReview } = useProjectStore();
+  const { jobStatus, fixtureResult, acceptReview, rejectReview, toggleLayerConfirmModal } = useProjectStore();
   const pending = (fixtureResult.reviewItems || []).filter((item) => item.status === "pending");
   if (jobStatus !== "review_required" && pending.length === 0) return null;
+
+  const getActionLabels = (type: string) => {
+    switch (type) {
+      case "CONFIRM_NO_BOTTOM_SMD":
+        return { accept: "确认无 BOT 贴片", reject: "重新指定图层" };
+      case "CONFIRM_NO_TOP_THT":
+        return { accept: "确认无需上锡", reject: "重新指定钻孔" };
+      case "CONFIRM_NO_SPRING_CLIP_REQUIRED":
+        return { accept: "确认无弹簧卡", reject: "重新指定 GTO" };
+      case "CONFIRM_NO_NPTH_AVAILABLE":
+        return { accept: "确认无可用定位孔", reject: "手动指定定位销" };
+      default:
+        return { accept: "接受", reject: "拒绝" };
+    }
+  };
+
+  const handleRejectAction = (item: { id: string; type: string }) => {
+    if (
+      item.type === "CONFIRM_NO_BOTTOM_SMD" ||
+      item.type === "CONFIRM_NO_TOP_THT" ||
+      item.type === "CONFIRM_NO_SPRING_CLIP_REQUIRED"
+    ) {
+      // 缺少图层时点击拒绝，弹出图层确认模态框以便用户重新指派图层
+      toggleLayerConfirmModal(true);
+    } else {
+      rejectReview(item.id);
+    }
+  };
 
   return (
     <div className="w-full shrink-0 bg-[#3e2e00]/95 border-b border-tertiary-container px-4 py-3 shadow-xl backdrop-blur-md max-h-56 overflow-y-auto">
@@ -22,6 +50,7 @@ export const ReviewBanner: React.FC = () => {
           <div className="mt-2 grid gap-2">
             {(fixtureResult.reviewItems || []).map((item) => {
               const isPending = item.status === "pending";
+              const labels = getActionLabels(item.type);
               return (
                 <div
                   key={item.id}
@@ -37,15 +66,15 @@ export const ReviewBanner: React.FC = () => {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => acceptReview(item.id)}
-                        className="px-2 py-0.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded text-[10px] transition-colors"
+                        className="px-2.5 py-0.5 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded text-[10px] font-semibold transition-colors"
                       >
-                        接受
+                        {labels.accept}
                       </button>
                       <button
-                        onClick={() => rejectReview(item.id)}
-                        className="px-2 py-0.5 bg-rose-800/80 hover:bg-rose-700 text-white rounded text-[10px] transition-colors"
+                        onClick={() => handleRejectAction(item)}
+                        className="px-2.5 py-0.5 bg-rose-800/80 hover:bg-rose-700 text-white rounded text-[10px] font-semibold transition-colors"
                       >
-                        拒绝
+                        {labels.reject}
                       </button>
                     </div>
                   )}

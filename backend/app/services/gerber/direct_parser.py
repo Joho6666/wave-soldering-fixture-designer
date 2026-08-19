@@ -116,7 +116,7 @@ def _parse_gerber_content_to_polygon(content: str) -> Polygon:
             polygon = polygon.buffer(0)
             if polygon.is_valid:
                 return polygon
-        except:
+        except Exception:
             pass
     
     return None
