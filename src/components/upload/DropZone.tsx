@@ -17,6 +17,7 @@ export const DropZone: React.FC = () => {
     hydrateJob,
     setAnalysis,
     setJobStatus,
+    loadNormalDemo,
     showToast
   } = useProjectStore();
 
@@ -227,11 +228,11 @@ export const DropZone: React.FC = () => {
       )}
 
       {/* Action Button */}
-      <div className="mt-8 flex justify-center">
+      <div className="mt-8 flex flex-col items-center gap-3">
         <button
           onClick={handleStartGeneration}
           disabled={!uploadedFileMeta || isAnalyzing}
-          className={`py-3 px-12 font-headline-md text-headline-md border transition-all duration-200 w-full sm:w-auto flex items-center justify-center gap-2 ${
+          className={`py-3 px-12 font-headline-md text-headline-md border transition-all duration-200 w-full sm:w-auto flex items-center justify-center gap-2 rounded ${
             uploadedFileMeta && !isAnalyzing
               ? "bg-primary-container text-on-primary-fixed border-primary-container font-bold hover:bg-surface-tint glow-cyan cursor-pointer"
               : "bg-surface-bright text-on-surface-variant opacity-50 cursor-not-allowed border-outline-variant"
@@ -249,6 +250,20 @@ export const DropZone: React.FC = () => {
             </>
           )}
         </button>
+
+        {!uploadedFileMeta && (
+          <div className="flex flex-col items-center gap-1.5 pt-1">
+            <span className="text-[11px] text-outline font-data-mono">或者直接体验：</span>
+            <button
+              type="button"
+              onClick={loadNormalDemo}
+              className="px-6 py-2 bg-surface-container-high border border-primary-container/70 hover:border-primary-container text-primary-container font-headline-md text-xs font-semibold rounded hover:bg-surface-tint/15 transition-all flex items-center gap-2 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[16px] text-amber-300">auto_awesome</span>
+              一键载入工业级治具演示案例 (180×120mm 双面混装主板)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Flow Indicator Steps */}

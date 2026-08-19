@@ -1,3 +1,4 @@
+import { buildDemoFixture } from "../utils/demoFixtureEngine";
 import { create } from "zustand";
 import { JobStatus, Project } from "../types/project";
 import { GerberLayer, PCBAnalysis } from "../types/gerber";
@@ -5,8 +6,7 @@ import { DEFAULT_PARAMETERS, FixtureParameters, FixtureResult } from "../types/f
 import { DesignIssue } from "../types/inspection";
 import { AiMessage } from "../types/ai";
 import { fixtureApi } from "../services/api";
-import { MOCK_NORMAL_PCB_ANALYSIS, MOCK_ERROR_PCB_ANALYSIS } from "../mocks/gerber";
-import { MOCK_FIXTURE_RESULT } from "../mocks/fixture";
+import { MOCK_ERROR_PCB_ANALYSIS } from "../mocks/gerber";
 
 export type ViewMode = "all" | "pcb_only" | "fixture_only";
 
@@ -570,24 +570,40 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   }),
 
   loadNormalDemo: () => {
-    if (!import.meta.env.DEV) return;
+    const { svg, result, analysis } = buildDemoFixture(get().parameters || DEFAULT_PARAMETERS, ["D1", "D2"]);
     set({
-      currentProject: { id: "320-WSJ-2024", name: "320-WSJ-2024-Gerber.zip", createdAt: new Date().toISOString(), status: "completed", progress: 100, logs: [] },
-      analysis: { ...MOCK_NORMAL_PCB_ANALYSIS },
-      fixtureResult: JSON.parse(JSON.stringify(MOCK_FIXTURE_RESULT)),
+      currentProject: {
+        id: "DEMO-WSJ-2026",
+        name: "320-WSJ-2026-Industrial-Gerber.zip",
+        createdAt: new Date().toISOString(),
+        status: "completed",
+        progress: 100,
+        currentStepDescription: "治具设计完成 (Client Standalone Engine)",
+        logs: [
+          { time: "10:00:00", level: "info", message: "解压 8 个 Gerber/Excellon 制造文件" },
+          { time: "10:00:01", level: "info", message: "识别 PCB 外形 (180.00 × 120.00 mm), 提取 326 个钻孔" },
+          { time: "10:00:02", level: "info", message: "计算沉板台阶与 R1.85mm 铣刀清角" },
+          { time: "10:00:02", level: "info", message: "聚类生成 18 处 BOT 贴片避位与 12 处 TOP 上锡窗口" },
+          { time: "10:00:03", level: "info", message: "自动排布左右钛合金挡锡条、4 处压扣与 2 处定位销" },
+          { time: "10:00:03", level: "info", message: "生成 AutoCAD R2018 DXF 与分层 SVG 预览完成" },
+        ],
+      },
+      analysis,
+      fixtureResult: result,
+      previewSvg: svg,
       jobStatus: "completed",
+      visibleLayers: { ...DEFAULT_VISIBLE_LAYERS },
     });
-    get().showToast("已载入开发 Demo", "info");
+    get().showToast("已成功载入工业级波峰焊治具演示案例！", "success");
   },
 
   loadErrorDemo: () => {
-    if (!import.meta.env.DEV) return;
     set({
       currentProject: { id: "ERR-OUTLINE-MISSING", name: "ERR-DEMO-NO-OUTLINE.zip", createdAt: new Date().toISOString(), status: "failed", progress: 30, errorCode: "MISSING_OUTLINE_LAYER", errorMessage: "未检测到有效 PCB 外形层", logs: [] },
       analysis: { ...MOCK_ERROR_PCB_ANALYSIS },
       jobStatus: "failed",
     });
-    get().showToast("已载入开发异常 Demo", "error");
+    get().showToast("已载入异常图层演示", "error");
   },
 }));
 

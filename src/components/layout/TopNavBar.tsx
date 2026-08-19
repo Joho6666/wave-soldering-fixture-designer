@@ -11,6 +11,7 @@ export const TopNavBar: React.FC = () => {
     isParameterDrawerOpen,
     isAiDrawerOpen,
     resetProject,
+    loadNormalDemo,
     toggleAiSettingsModal,
     showToast
   } = useProjectStore();
@@ -32,13 +33,22 @@ export const TopNavBar: React.FC = () => {
           </span>
         </button>
 
-        {jobStatus !== "idle" && (
+        {jobStatus !== "idle" ? (
           <>
             <div className="h-4 w-px bg-outline-variant mx-2"></div>
             <span className="font-data-mono text-body-sm text-on-surface-variant">
               项目: <span className="text-on-surface font-semibold">{projectName}</span>
             </span>
           </>
+        ) : (
+          <button
+            onClick={loadNormalDemo}
+            className="ml-3 px-3 py-1 bg-surface-container-high border border-primary-container/80 text-primary-container font-headline-md text-xs font-semibold rounded hover:bg-surface-tint/15 transition-colors flex items-center gap-1.5 shadow-sm"
+            title="无需上传文件，一键载入工业级治具演示"
+          >
+            <span className="material-symbols-outlined text-[15px] text-amber-300">auto_awesome</span>
+            <span>演示案例 (Demo)</span>
+          </button>
         )}
       </div>
 
