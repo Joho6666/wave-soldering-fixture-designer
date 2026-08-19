@@ -163,6 +163,23 @@ class ManualFixtureDxfParser:
 
     def _entity_to_shapely(self, entity) -> LineString | Polygon | None:
         etype = entity.dxftype()
+        # 1. 优先使用 ezdxf.path.make_path 转换复杂 CAD 实体（支持 SPLINE, ELLIPSE, ARC, LWPOLYLINE 带圆角凸度）
+        try:
+            from ezdxf.path import make_path
+            path_obj = make_path(entity)
+            pts = [(round(p.x, 4), round(p.y, 4)) for p in path_obj.flattening(distance=0.05)]
+            if len(pts) >= 2:
+                if path_obj.is_closed and len(pts) >= 3:
+                    if pts[0] != pts[-1]:
+                        pts.append(pts[0])
+                    poly = Polygon(pts)
+                    if poly.is_valid and not poly.is_empty:
+                        return poly
+                return LineString(pts)
+        except Exception:
+            pass
+
+        # 2. 降级直接提取几何端点
         try:
             if etype == "LINE":
                 s = entity.dxf.start

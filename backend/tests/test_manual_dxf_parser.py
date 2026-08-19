@@ -126,3 +126,25 @@ class TestManualFixtureDxfParser:
 
         assert len(result.sink_region) == 1
         assert result.sink_region[0].area == pytest.approx(300.0, abs=0.1)
+
+    def test_spline_and_ellipse_entities(self, tmp_path):
+        doc = ezdxf.new("R2018")
+        msp = doc.modelspace()
+        doc.layers.new("KEEPOUT_BOT")
+        doc.layers.new("SOLDER_TOP")
+
+        # 闭合 Spline
+        msp.add_spline([(0, 0), (10, 5), (20, 0), (10, -5), (0, 0)], dxfattribs={"layer": "KEEPOUT_BOT"})
+        # 闭合 Ellipse
+        msp.add_ellipse((50, 50), (15, 0), ratio=0.6, dxfattribs={"layer": "SOLDER_TOP"})
+
+        dxf_path = str(tmp_path / "complex_entities.dxf")
+        doc.saveas(dxf_path)
+
+        parser = ManualFixtureDxfParser()
+        result = parser.parse(dxf_path)
+
+        assert len(result.keepout_regions) >= 1
+        assert len(result.solder_regions) >= 1
+        assert result.keepout_regions[0].area > 0
+        assert result.solder_regions[0].area > 0
