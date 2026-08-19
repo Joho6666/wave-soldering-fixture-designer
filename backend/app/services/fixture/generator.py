@@ -23,7 +23,7 @@ class FixtureGenerator:
         if self.pcb is None or self.pcb.outline is None or self.pcb.outline.is_empty:
             raise FixtureGenerationError("缺少真实 PCBGeometry，禁止使用估算外形生成治具。")
 
-    def generate(self, parameters: dict[str, Any], review_actions: dict[str, str] | None = None, manual_pins: list[str] | None = None) -> dict[str, Any]:
+    def generate(self, parameters: dict[str, Any], review_actions: dict[str, str] | None = None, manual_pins: list[str] | None = None, custom_regions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         params = self._parameters(parameters)
         
         # 1. 沉板区生成 + R1.85 铣刀角清角 (Corner Relief)
@@ -51,6 +51,21 @@ class FixtureGenerator:
         # 7. TOP 丝印弹簧卡安装孔
         spring_clips, spring_clip_review = self._front_panel_spring_clips(params, review_actions)
         
+        # 7.5. 自定义开窗/避位区注入 (AI / 工程师非标建设)
+        if custom_regions:
+            for cr in custom_regions:
+                cx = float(cr.get("x", 0.0))
+                cy = float(cr.get("y", 0.0))
+                w = float(cr.get("width", 10.0))
+                h = float(cr.get("height", 10.0))
+                rtype = cr.get("regionType", "keepout")
+                poly = box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+                if not poly.is_empty:
+                    if rtype == "keepout":
+                        keepouts.append(poly)
+                    elif rtype == "solder":
+                        solder_regions.append(poly)
+
         # 汇总 Review 项
         review_items = [*locating_review, *keepout_review, *solder_review, *spring_clip_review]
         pending_mandatory_reviews = [r for r in review_items if r.get("mandatory", True) and r.get("status") == "pending"]

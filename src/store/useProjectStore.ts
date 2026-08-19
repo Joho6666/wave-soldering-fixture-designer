@@ -380,29 +380,29 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!job || !command) return;
 
     try {
-      if (command.kind === "update_parameters" && command.parameters) {
-        get().updateParameters(command.parameters);
-        await get().regenerate();
-        set({
-          aiMessages: get().aiMessages.map((m) =>
-            m.id === message.id ? { ...m, commandStatus: "applied" } : m
-          ),
-        });
-        get().showToast("AI 建议参数已应用并重新出图", "success");
-      } else if (command.kind === "regenerate") {
-        await get().regenerate();
-        set({
-          aiMessages: get().aiMessages.map((m) =>
-            m.id === message.id ? { ...m, commandStatus: "applied" } : m
-          ),
-        });
-        get().showToast("已重新生成治具", "success");
-      } else if (command.kind === "locate_issue" && command.issueId) {
+      await fixtureApi.sendAiCommand(job.id, {
+        userMessage: command.reason || "apply",
+        conversationId: job.id,
+        command,
+        apply: true,
+      });
+
+      set({
+        aiMessages: get().aiMessages.map((m) =>
+          m.id === message.id ? { ...m, commandStatus: "applied" } : m
+        ),
+      });
+
+      await get().hydrateJob(job.id);
+
+      if (command.kind === "locate_issue" && command.issueId) {
         const issue = get().fixtureResult.issues.find((i) => i.id === command.issueId);
         if (issue) {
           get().locateIssue(issue);
         }
       }
+
+      get().showToast(`AI 建设指令已执行并完成出图`, "success");
     } catch (error) {
       set({
         aiMessages: get().aiMessages.map((m) =>

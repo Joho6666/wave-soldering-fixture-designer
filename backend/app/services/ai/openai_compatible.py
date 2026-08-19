@@ -13,6 +13,10 @@ from app.models.ai_schemas import (
     CADCommand,
     NoOpCommand,
     UpdateParametersCommand,
+    ApplyRecipePresetCommand,
+    SetLocatingPinsCommand,
+    AddCustomRegionCommand,
+    AutoFixDrcCommand,
     RegenerateCommand,
     LocateIssueCommand,
     ExplainIssueCommand,
@@ -21,23 +25,112 @@ from app.models.ai_schemas import (
 logger = logging.getLogger(__name__)
 COMMAND_ADAPTER = TypeAdapter(CADCommand)
 
-SYSTEM_PROMPT = """你是一个专业的波峰焊治具工程设计 AI 助手。请以严格的 JSON 格式输出回复，包含 "message" 和 "command" 两个顶层字段。
+RECIPE_PRESETS = {
+    "automotive_high_reliability": {
+        "name": "汽车电子高可靠性标准",
+        "description": "加宽避位安全裕量至 1.0mm，壁厚 >= 2.5mm，加大压扣偏移防振",
+        "parameters": {
+            "sinkClearanceMm": 0.3,
+            "keepoutClearanceMm": 1.0,
+            "solderClearanceMm": 3.5,
+            "clampOffsetMm": 12.0,
+            "minimumMaterialWebMm": 2.5,
+            "solderMinOuterDiameterMm": 3.2,
+            "keepoutInnerFilletMm": 1.5,
+            "fixtureMarginXmm": 25.0,
+            "fixtureMarginYmm": 35.0,
+        },
+    },
+    "dense_consumer": {
+        "name": "高密消费电子微间距标准",
+        "description": "紧凑微间距避位 0.5mm，上锡开窗 2.0mm，紧凑边距以适应狭小拼板",
+        "parameters": {
+            "sinkClearanceMm": 0.15,
+            "keepoutClearanceMm": 0.5,
+            "solderClearanceMm": 2.0,
+            "minimumMaterialWebMm": 1.5,
+            "solderMinOuterDiameterMm": 2.5,
+            "keepoutInnerFilletMm": 1.0,
+            "fixtureMarginXmm": 18.0,
+            "fixtureMarginYmm": 25.0,
+        },
+    },
+    "thick_copper_heavy": {
+        "name": "厚铜重载治具标准",
+        "description": "强化治具外框边距 (30×40mm)，加宽取手位与导轨，提升耐热形变刚度",
+        "parameters": {
+            "sinkClearanceMm": 0.25,
+            "keepoutClearanceMm": 0.8,
+            "solderClearanceMm": 3.5,
+            "minimumMaterialWebMm": 2.5,
+            "fixtureMarginXmm": 30.0,
+            "fixtureMarginYmm": 40.0,
+            "handholdWidthMm": 25.0,
+            "handholdHeightMm": 50.0,
+            "railWidthMm": 6.0,
+            "solderBarrierWidthMm": 12.0,
+        },
+    },
+    "standard": {
+        "name": "标准波峰焊通用规范",
+        "description": "标准沉板 0.2mm，避位 0.7mm，上锡 3.0mm，壁厚 2.0mm",
+        "parameters": {
+            "sinkClearanceMm": 0.2,
+            "keepoutClearanceMm": 0.7,
+            "solderClearanceMm": 3.0,
+            "filletRadiusMm": 1.85,
+            "clampHoleDiameterMm": 3.4,
+            "clampOffsetMm": 10.0,
+            "handholdWidthMm": 20.0,
+            "handholdHeightMm": 40.0,
+            "handholdOverlapMm": 1.0,
+            "handholdCornerRadiusMm": 2.0,
+            "fixtureMarginXmm": 20.0,
+            "fixtureMarginYmm": 30.0,
+            "fixtureCornerRadiusMm": 5.0,
+            "railWidthMm": 5.0,
+            "solderBarrierWidthMm": 10.0,
+            "minimumMaterialWebMm": 2.0,
+            "springClipRadiusMm": 2.45,
+            "keepoutInnerFilletMm": 1.5,
+            "solderMinOuterDiameterMm": 3.0,
+            "fixtureSizeRoundStepMm": 5.0,
+        },
+    },
+}
+
+SYSTEM_PROMPT = """你是一个专业的波峰焊治具工程设计 AI 助手。你能够深度参与治具的建设、优化与审查。
+请以严格的 JSON 格式输出回复，包含 "message" 和 "command" 两个顶层字段。
 
 格式规范：
-1. "message": string，面向工程师的中文专业解释或对话回复。
-2. "command": object，结构化 CAD 控制指令。
+1. "message": string，面向工程师的中文专业解释、设计建议或分析说明。
+2. "command": object，结构化 CAD 建设/控制指令。
 
 支持的 command 类型：
-1. 普通对话/问答/无须修改几何：
+1. 【工艺配方建设】应用标准化配方预设（automotive_high_reliability / dense_consumer / thick_copper_heavy / standard）：
+   {"message": "已为您推荐并配置汽车电子高可靠性工艺配方...", "command": {"kind": "apply_recipe_preset", "presetId": "automotive_high_reliability", "presetName": "汽车电子高可靠性标准", "parameters": {"keepoutClearanceMm": 1.0, "minimumMaterialWebMm": 2.5, "solderClearanceMm": 3.5}, "reason": "提升耐温抗振裕量", "requiresConfirmation": true}}
+
+2. 【定位孔方案建设】指定/切换定位销方案（从 context 中的 locatingCandidates 筛选合适钻孔 drillId）：
+   {"message": "已为您优选对角两处 Ø3.2mm NPTH 机械定位孔...", "command": {"kind": "set_locating_pins", "pinDrillIds": ["D1", "D2"], "reason": "选用对角非金属化定位孔", "requiresConfirmation": true}}
+
+3. 【自定义几何开窗建设】在指定坐标新增非标避位槽或透锡槽（keepout / solder）：
+   {"message": "已在指定坐标 (50, 30) 处规划 20×15mm 自定义避位槽...", "command": {"kind": "add_custom_region", "regionType": "keepout", "x": 50.0, "y": 30.0, "width": 20.0, "height": 15.0, "label": "J1排针避位", "reason": "避让非标接插件", "requiresConfirmation": true}}
+
+4. 【DRC 缺陷自动修复建设】针对壁厚不足、干涉等 DRC 错误，自动计算修复参数方案：
+   {"message": "检测到上锡窗口与沉板边材料壁厚过薄，建议将 solderClearanceMm 微调至 2.5mm 以满足 2.0mm 最小壁厚要求。", "command": {"kind": "auto_fix_drc", "targetIssueIds": ["drc-minimum_material_web_too_small-global"], "suggestedParameters": {"solderClearanceMm": 2.5}, "reason": "消除壁厚过薄 DRC 违规", "requiresConfirmation": true}}
+
+5. 【单项参数微调】
+   {"message": "已将避位安全距离调整为 1.2mm。", "command": {"kind": "update_parameters", "parameters": {"keepoutClearanceMm": 1.2}, "reason": "调整避位间距", "requiresConfirmation": true}}
+
+6. 【重新生成出图】
+   {"message": "正在为您重新计算治具几何。", "command": {"kind": "regenerate", "reason": "重新生成治具", "requiresConfirmation": true}}
+
+7. 【定位与解释缺陷】
+   {"message": "已在图纸中定位并高亮该项缺陷。", "command": {"kind": "locate_issue", "issueId": "drc-xxx", "reason": "定位缺陷", "requiresConfirmation": false}}
+   {"message": "该避位区由于周边贴片电容密集，建议扩孔...", "command": {"kind": "explain_issue", "issueId": "drc-xxx", "reason": "解释缺陷原因", "requiresConfirmation": false}}
+
+8. 【普通对话与咨询】
    {"message": "您好！我是波峰焊治具 AI 助手，有什么可以帮您？", "command": {"kind": "no_op", "reason": "问候回复", "requiresConfirmation": false}}
-2. 调整工程参数（参数名必须以 Mm 结尾，如 sinkClearanceMm, keepoutClearanceMm, solderClearanceMm, filletRadiusMm, clampOffsetMm, railWidthMm, solderBarrierWidthMm, springClipRadiusMm, keepoutInnerFilletMm, solderMinOuterDiameterMm, minimumMaterialWebMm 等）：
-   {"message": "已为您将沉板间隙调整为 0.5mm。", "command": {"kind": "update_parameters", "parameters": {"sinkClearanceMm": 0.5}, "reason": "调整沉板间隙", "requiresConfirmation": true}}
-3. 重新生成治具：
-   {"message": "正在为您重新生成波峰焊治具几何。", "command": {"kind": "regenerate", "reason": "重新生成治具", "requiresConfirmation": true}}
-4. 在 CAD 中定位 DRC 问题：
-   {"message": "已在图纸中高亮显示该项 DRC 缺陷。", "command": {"kind": "locate_issue", "issueId": "issue-id", "reason": "在图纸中定位", "requiresConfirmation": false}}
-5. 解释 DRC 问题：
-   {"message": "该避位区因距离元件焊盘过近可能导致锡膏连锡...", "command": {"kind": "explain_issue", "issueId": "issue-id", "reason": "解释 DRC 原因", "requiresConfirmation": false}}
 
 禁止输出非 JSON 格式内容或多余的 Markdown 标记。"""
 
@@ -75,7 +168,6 @@ def _extract_json_document(raw: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # 若模型直接输出了普通文本，包装为合法的 no_op 响应
     return {
         "message": raw[:4000],
         "command": {
@@ -91,8 +183,20 @@ def _normalize_command(document: dict, default_message: str) -> tuple[CADCommand
     message = str(document.get("message") or document.get("response") or default_message)[:4000]
     raw_cmd = document.get("command")
 
+    valid_kinds = {
+        "no_op",
+        "update_parameters",
+        "apply_recipe_preset",
+        "set_locating_pins",
+        "add_custom_region",
+        "auto_fix_drc",
+        "regenerate",
+        "locate_issue",
+        "explain_issue",
+    }
+
     if not isinstance(raw_cmd, dict):
-        if isinstance(raw_cmd, str) and raw_cmd in {"no_op", "update_parameters", "regenerate", "locate_issue", "explain_issue"}:
+        if isinstance(raw_cmd, str) and raw_cmd in valid_kinds:
             raw_cmd = {"kind": raw_cmd}
         else:
             raw_cmd = {"kind": "no_op", "reason": message or "常规对话回复", "requiresConfirmation": False}
@@ -101,7 +205,24 @@ def _normalize_command(document: dict, default_message: str) -> tuple[CADCommand
     if "reason" not in raw_cmd or not raw_cmd["reason"]:
         raw_cmd["reason"] = message or "常规对话"
     if "requiresConfirmation" not in raw_cmd:
-        raw_cmd["requiresConfirmation"] = kind in {"update_parameters", "regenerate"}
+        raw_cmd["requiresConfirmation"] = kind in {
+            "update_parameters",
+            "apply_recipe_preset",
+            "set_locating_pins",
+            "add_custom_region",
+            "auto_fix_drc",
+            "regenerate",
+        }
+
+    # 如果是 apply_recipe_preset 且缺参数，自动从内置预设补全
+    if kind == "apply_recipe_preset":
+        pid = raw_cmd.get("presetId", "standard")
+        if pid in RECIPE_PRESETS:
+            preset = RECIPE_PRESETS[pid]
+            if not raw_cmd.get("presetName"):
+                raw_cmd["presetName"] = preset["name"]
+            if not raw_cmd.get("parameters"):
+                raw_cmd["parameters"] = preset["parameters"]
 
     try:
         command = COMMAND_ADAPTER.validate_python(raw_cmd)
@@ -164,4 +285,3 @@ async def parse_command(message: str, context: dict[str, Any]) -> tuple[CADComma
     except Exception as exc:
         logger.error(f"AI 调用未预期异常: {exc}", exc_info=True)
         raise AIProviderError(f"AI 服务调用异常: {str(exc)}") from exc
-

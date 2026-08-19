@@ -1,10 +1,30 @@
 import { FixtureParameters } from "./fixture";
 
-export type AiCommandKind = "update_parameters" | "regenerate" | "locate_issue" | "explain_issue" | "no_op";
+export type AiCommandKind =
+  | "update_parameters"
+  | "apply_recipe_preset"
+  | "set_locating_pins"
+  | "add_custom_region"
+  | "auto_fix_drc"
+  | "regenerate"
+  | "locate_issue"
+  | "explain_issue"
+  | "no_op";
 
 export interface AiCommand {
   kind: AiCommandKind;
+  presetId?: "automotive_high_reliability" | "dense_consumer" | "thick_copper_heavy" | "standard";
+  presetName?: string;
   parameters?: Partial<FixtureParameters>;
+  suggestedParameters?: Partial<FixtureParameters>;
+  pinDrillIds?: string[];
+  regionType?: "keepout" | "solder";
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  label?: string;
+  targetIssueIds?: string[];
   issueId?: string;
   reason: string;
   requiresConfirmation: boolean;

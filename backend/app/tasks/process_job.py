@@ -42,6 +42,7 @@ def process_gerber_job(
     db: Session,
     manual_pins: list[str] | None = None,
     review_actions: dict[str, str] | None = None,
+    custom_regions: list[dict[str, Any]] | None = None,
 ):
     """
     处理 Gerber 任务的主流水线
@@ -105,12 +106,15 @@ def process_gerber_job(
         if review_actions is None and job.result_data:
             existing_items = job.result_data.get("reviewItems", [])
             review_actions = {r["id"]: r["status"] for r in existing_items if r.get("status") in {"accepted", "rejected", "modified"}}
+        if custom_regions is None and job.result_data:
+            custom_regions = job.result_data.get("customRegions", [])
 
         generator = FixtureGenerator({"pcb_geometry": pcb_geom})
         fixture_data = generator.generate(
             job.parameters or {},
             review_actions=review_actions,
             manual_pins=manual_pins,
+            custom_regions=custom_regions,
         )
 
         job.progress = 80
@@ -148,6 +152,7 @@ def process_gerber_job(
             "reviewItems": fixture_data.get("reviewItems", []),
             "locatingCandidates": fixture_data.get("locating_candidates", []),
             "manualLocatingPins": manual_pins,
+            "customRegions": custom_regions or [],
             "status": job.status,
             "geometrySha256": fixture_data.get("geometrySha256"),
             "drcOverrides": existing_overrides,

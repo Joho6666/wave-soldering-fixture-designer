@@ -1,7 +1,7 @@
 """Strict, non-arbitrary AI command contracts."""
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, List
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from app.models.schemas import FixtureParameters
@@ -28,6 +28,7 @@ class ParameterPatch(BaseModel):
     springClipRadiusMm: FiniteFloat | None = Field(None, gt=0, le=20)
     keepoutInnerFilletMm: FiniteFloat | None = Field(None, ge=0, le=20)
     solderMinOuterDiameterMm: FiniteFloat | None = Field(None, gt=0, le=30)
+    fixtureSizeRoundStepMm: FiniteFloat | None = Field(None, gt=0, le=50)
 
     def values(self) -> dict:
         return self.model_dump(exclude_none=True)
@@ -38,6 +39,46 @@ class UpdateParametersCommand(BaseModel):
     kind: Literal["update_parameters"] = "update_parameters"
     parameters: ParameterPatch
     reason: str = Field(default="调整工程参数", max_length=1000)
+    requiresConfirmation: bool = True
+
+
+class ApplyRecipePresetCommand(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    kind: Literal["apply_recipe_preset"] = "apply_recipe_preset"
+    presetId: Literal["automotive_high_reliability", "dense_consumer", "thick_copper_heavy", "standard"]
+    presetName: str = Field(default="", max_length=100)
+    parameters: ParameterPatch
+    reason: str = Field(default="应用工艺配方预设", max_length=1000)
+    requiresConfirmation: bool = True
+
+
+class SetLocatingPinsCommand(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    kind: Literal["set_locating_pins"] = "set_locating_pins"
+    pinDrillIds: List[str] = Field(min_length=1, max_length=10)
+    reason: str = Field(default="指定定位孔方案", max_length=1000)
+    requiresConfirmation: bool = True
+
+
+class AddCustomRegionCommand(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    kind: Literal["add_custom_region"] = "add_custom_region"
+    regionType: Literal["keepout", "solder"]
+    x: float = Field(..., description="X 坐标 (mm)")
+    y: float = Field(..., description="Y 坐标 (mm)")
+    width: float = Field(..., gt=0, le=500, description="区域宽度 (mm)")
+    height: float = Field(..., gt=0, le=500, description="区域高度 (mm)")
+    label: str = Field(default="", max_length=100)
+    reason: str = Field(default="添加自定义避位/上锡区域", max_length=1000)
+    requiresConfirmation: bool = True
+
+
+class AutoFixDrcCommand(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    kind: Literal["auto_fix_drc"] = "auto_fix_drc"
+    targetIssueIds: List[str] = Field(default_factory=list)
+    suggestedParameters: ParameterPatch
+    reason: str = Field(default="自动修复 DRC 规则违规", max_length=1000)
     requiresConfirmation: bool = True
 
 
@@ -72,7 +113,15 @@ class NoOpCommand(BaseModel):
 
 
 CADCommand = Annotated[
-    UpdateParametersCommand | RegenerateCommand | LocateIssueCommand | ExplainIssueCommand | NoOpCommand,
+    UpdateParametersCommand
+    | ApplyRecipePresetCommand
+    | SetLocatingPinsCommand
+    | AddCustomRegionCommand
+    | AutoFixDrcCommand
+    | RegenerateCommand
+    | LocateIssueCommand
+    | ExplainIssueCommand
+    | NoOpCommand,
     Field(discriminator="kind"),
 ]
 
