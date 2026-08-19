@@ -1,7 +1,7 @@
 """
 Pydantic 数据模型（API 请求/响应）
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -212,6 +212,7 @@ class FixtureResult(BaseModel):
 
 class JobResponse(BaseModel):
     """Job 响应"""
+    model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
     status: JobStatus
@@ -220,9 +221,6 @@ class JobResponse(BaseModel):
     currentStepDescription: Optional[str] = None
     error: Optional[FixtureError] = None
     logs: List[DiagnosticLog] = []
-
-    class Config:
-        from_attributes = True
 
 
 class JobCreate(BaseModel):
