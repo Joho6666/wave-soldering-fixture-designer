@@ -1,0 +1,6 @@
+{
+  "case_id": "CASE-001",
+  "description": "Standard demo board — placeholder for engineer-provided golden sample",
+  "status": "awaiting_manual_dxf",
+  "notes": "Place manual_fixture.dxf and gerber.zip here to enable comparison"
+}

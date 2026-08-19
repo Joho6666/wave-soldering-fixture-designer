@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+backend/.venv/
+.venv/
+env/
+
+# Build and caches
+dist/
+build/
+backend/__pycache__/
+**/__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+
+# Local runtime data
+uploads/
+outputs/
+backend/uploads/
+backend/outputs/
+backend/*.db
+*.sqlite
+*.db
+
+# Environment and sensitive files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Production samples with proprietary data
+production_samples/*/source.zip

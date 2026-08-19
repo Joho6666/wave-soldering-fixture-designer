@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>无法识别 PCB Gerber - WAVE-FIXTURE AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Hanken+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#006875",
+                    "error-container": "#93000a",
+                    "primary": "#c3f5ff",
+                    "on-tertiary": "#3e2e00",
+                    "outline-variant": "#3b494c",
+                    "tertiary": "#ffeac0",
+                    "primary-container": "#00e5ff",
+                    "on-background": "#dce4e5",
+                    "inverse-surface": "#dce4e5",
+                    "on-primary-fixed": "#001f24",
+                    "on-secondary-fixed-variant": "#42474f",
+                    "secondary-fixed": "#dee2ec",
+                    "surface-container-high": "#242b2d",
+                    "surface-tint": "#00daf3",
+                    "primary-fixed": "#9cf0ff",
+                    "tertiary-fixed": "#ffdf96",
+                    "on-primary-fixed-variant": "#004f58",
+                    "surface": "#0d1516",
+                    "on-secondary-fixed": "#171c23",
+                    "on-surface": "#dce4e5",
+                    "background": "#0d1516",
+                    "error": "#ffb4ab",
+                    "inverse-on-surface": "#2a3233",
+                    "on-tertiary-container": "#6f5500",
+                    "outline": "#849396",
+                    "on-primary": "#00363d",
+                    "secondary-container": "#42474f",
+                    "surface-container-lowest": "#080f11",
+                    "surface-container-highest": "#2e3638",
+                    "secondary-fixed-dim": "#c2c7d0",
+                    "secondary": "#c2c7d0",
+                    "surface-container": "#192122",
+                    "surface-variant": "#2e3638",
+                    "on-secondary-container": "#b1b5bf",
+                    "on-error": "#690005",
+                    "on-tertiary-fixed-variant": "#594400",
+                    "on-secondary": "#2c3138",
+                    "tertiary-container": "#fec931",
+                    "on-tertiary-fixed": "#251a00",
+                    "surface-container-low": "#151d1e",
+                    "primary-fixed-dim": "#00daf3",
+                    "on-primary-container": "#00626e",
+                    "tertiary-fixed-dim": "#f3bf26",
+                    "on-error-container": "#ffdad6",
+                    "surface-dim": "#0d1516",
+                    "surface-bright": "#333a3c",
+                    "on-surface-variant": "#bac9cc"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "sidebar-width": "280px",
+                    "unit": "4px",
+                    "panel-padding": "12px",
+                    "container-gap": "8px",
+                    "gutter": "1px",
+                    "toolbar-height": "48px"
+            },
+            "fontFamily": {
+                    "data-mono": ["JetBrains Mono"],
+                    "body-sm": ["Inter"],
+                    "label-caps": ["JetBrains Mono"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "data-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "label-caps": ["10px", {"lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-md": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .cyber-grid {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(59, 73, 76, 0.1) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(59, 73, 76, 0.1) 1px, transparent 1px);
+        }
+        .error-glow {
+            box-shadow: 0 0 15px rgba(255, 180, 171, 0.15);
+        }
+        .glitch-effect {
+            position: relative;
+        }
+        .glitch-effect::before, .glitch-effect::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .glitch-effect::before {
+            left: 2px;
+            text-shadow: -1px 0 rgba(255, 180, 171, 0.5);
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+        .glitch-effect::after {
+            left: -2px;
+            text-shadow: -1px 0 rgba(0, 229, 255, 0.3);
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim 2.5s infinite linear alternate-reverse;
+        }
+        @keyframes glitch-anim {
+            0% { clip: rect(48px, 9999px, 83px, 0); }
+            20% { clip: rect(98px, 9999px, 81px, 0); }
+            40% { clip: rect(11px, 9999px, 8px, 0); }
+            60% { clip: rect(54px, 9999px, 55px, 0); }
+            80% { clip: rect(21px, 9999px, 4px, 0); }
+            100% { clip: rect(80px, 9999px, 60px, 0); }
+        }
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); }
+            20% { clip: rect(3px, 9999px, 10px, 0); }
+            40% { clip: rect(35px, 9999px, 20px, 0); }
+            60% { clip: rect(80px, 9999px, 40px, 0); }
+            80% { clip: rect(15px, 9999px, 70px, 0); }
+            100% { clip: rect(90px, 9999px, 90px, 0); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-hidden antialiased selection:bg-error selection:text-on-error">
+<!-- TopNavBar (Nav suppressed due to transactional intent) -->
+<header class="bg-surface border-b border-outline-variant flex justify-between items-center h-toolbar-height px-panel-padding w-full z-50 flex-shrink-0">
+<div class="flex items-center gap-container-gap">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">memory</span>
+<span class="font-headline-md text-headline-md font-bold text-primary-container tracking-tight">WAVE-FIXTURE AI</span>
+</div>
+<div class="flex items-center gap-container-gap">
+<button class="p-unit text-on-surface-variant hover:text-primary-container transition-colors rounded">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-unit text-on-surface-variant hover:text-primary-container transition-colors rounded">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-DEFAULT overflow-hidden border border-outline-variant ml-unit">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A macro shot of a complex circuit board with glowing blue traces and silver solder joints, representing precision engineering and technology in a dark, high-contrast style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZfWJQbX5LsmS35rXvIIWNtdEPT-EXZcC4TuPEQoWx8zcWIQtLN0v-GIPU6w-8BNWx5W9gsDLLHjRVy5SsfxCQ5sLnEeWAVQDtDJQUz8bN1pY5O5WnMFSjaedTNfAtBLzQBf67HTbgf3N3aFikAVhpSuyUTX8kus90WF3pH6D7xaiV-WwngB0SWSKbp6eG9slGCNqmkVlNVTJ2eqaWdygjt72XNmseJMU89GNJhVAnEoYZVwOrtNWv"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-grow flex items-center justify-center relative cyber-grid p-panel-padding">
+<!-- Error Container -->
+<div class="max-w-2xl w-full bg-surface-container border border-error-container p-8 rounded-DEFAULT relative overflow-hidden error-glow z-10 shadow-[0_0_40px_rgba(147,0,10,0.1)]">
+<!-- Technical Accent -->
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-error-container via-error to-error-container"></div>
+<div class="absolute top-0 right-0 p-2 opacity-30">
+<span class="font-data-mono text-data-mono text-error">ERR_CODE: GBR_OUTLINE_MISSING</span>
+</div>
+<div class="flex flex-col md:flex-row gap-8 items-start">
+<!-- Icon Area -->
+<div class="flex-shrink-0 flex items-center justify-center w-16 h-16 bg-error-container/20 border border-error/30 rounded-DEFAULT relative">
+<span class="material-symbols-outlined text-4xl text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+<div class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full animate-ping"></div>
+<div class="absolute -bottom-2 -left-2 w-4 h-4 border-l border-b border-error opacity-50"></div>
+<div class="absolute -top-2 -right-2 w-4 h-4 border-r border-t border-error opacity-50"></div>
+</div>
+<!-- Content Area -->
+<div class="flex-grow space-y-6">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-error mb-2 tracking-tight glitch-effect" data-text="无法识别 PCB Gerber">无法识别 PCB Gerber</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">未检测到有效 PCB 外形层。AI 分析引擎需要明确的板框定义才能生成合规的波峰焊夹具设计。</p>
+</div>
+<!-- Technical Details Box -->
+<div class="bg-surface border border-outline-variant rounded-DEFAULT p-4">
+<div class="flex items-center gap-2 mb-3 border-b border-outline-variant pb-2">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">analytics</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Diagnostic Log</span>
+</div>
+<ul class="space-y-3 font-data-mono text-data-mono text-on-surface">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">cancel</span>
+<div>
+<span class="text-error font-bold">Possible Reason 01:</span>
+<span class="text-on-surface-variant ml-2">Gerber incomplete / 缺少必要文件层。</span>
+</div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">cancel</span>
+<div>
+<span class="text-error font-bold">Possible Reason 02:</span>
+<span class="text-on-surface-variant ml-2">Missing Board Outline / 外形线未闭合或未定义在标准机械层。</span>
+</div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">cancel</span>
+<div>
+<span class="text-error font-bold">Possible Reason 03:</span>
+<span class="text-on-surface-variant ml-2">Format not supported / 不支持的文件格式 (建议使用 RS-274X)。</span>
+</div>
+</li>
+</ul>
+</div>
+<!-- Actions -->
+<div class="flex flex-col sm:flex-row gap-4 pt-4 border-t border-outline-variant">
+<button class="bg-primary-container text-on-primary-container font-headline-md text-headline-md px-6 py-2 rounded-DEFAULT hover:bg-surface-tint transition-colors focus:outline-none focus:ring-2 focus:ring-primary flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">upload</span>
+                            重新上传
+                        </button>
+<button class="bg-transparent border border-outline-variant text-on-surface font-body-md text-body-md px-6 py-2 rounded-DEFAULT hover:bg-surface-container-highest hover:border-on-surface-variant transition-colors focus:outline-none focus:ring-2 focus:ring-outline flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">layers</span>
+                            手动选择 PCB 外形层
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-low border-t border-outline-variant h-8 flex justify-between items-center px-panel-padding z-50 flex-shrink-0 cursor-default">
+<span class="font-label-caps text-label-caps text-on-surface-variant">PRECISION CAD v2.4.0 | SCALE 1:1</span>
+<div class="flex gap-4 font-data-mono text-data-mono text-on-surface-variant">
+<span>Units: MM</span>
+<span>Grid: 1.0mm</span>
+<span class="text-error">Status: ERR_HALT</span>
+</div>
+</footer>
+</body></html>
