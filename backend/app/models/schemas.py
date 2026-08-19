@@ -142,6 +142,7 @@ class DrcOverrideRecord(BaseModel):
     timestamp: str
     originalSeverity: str
     geometrySha256: Optional[str] = None
+    status: str = "active"
 
 
 class ProductionGateResult(BaseModel):

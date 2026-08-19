@@ -287,10 +287,10 @@ class FixtureGenerator:
         if not holes:
             review_items.append({
                 "id": "review-locating-no-drills",
-                "type": "locating_pin_candidate",
+                "type": "CONFIRM_NO_NPTH_AVAILABLE",
                 "status": "pending",
-                "title": "未检测到定位孔",
-                "description": "Excellon 钻孔中无可用定位孔，需人工在板外工艺边补充或确认治具固定方案。",
+                "title": "未检测到定位孔 - 请确认固定方案",
+                "description": "Excellon 钻孔中无可用定位孔。请确认本板无可用 NPTH 定位孔，或手动指定定位孔位置。",
                 "confidence": 0.0,
                 "mandatory": True,
             })
@@ -406,12 +406,12 @@ class FixtureGenerator:
         if not geom_candidates:
             review_items.append({
                 "id": "review-bot-keepout-missing-layer",
-                "type": "bot_keepout_region",
+                "type": "CONFIRM_NO_BOTTOM_SMD",
                 "status": review_actions.get("review-bot-keepout-missing-layer", "pending") if review_actions else "pending",
-                "title": "BOT 避位数据源不足",
-                "description": "未检测到底层丝印 (GBO) 或阻焊 (GBS) 层，无法自动生成贴片元件避位。",
+                "title": "缺少 BOT 层数据 - 请确认本板无 BOT 贴片",
+                "description": "未检测到底层丝印 (GBO) 或阻焊 (GBS) 层。若本板确实无 BOT 贴片元件，请确认放行；否则请重新指定图层。",
                 "confidence": 0.4,
-                "mandatory": False,
+                "mandatory": True,
             })
             return [], review_items
 
@@ -462,12 +462,12 @@ class FixtureGenerator:
         if not pth_holes:
             review_items.append({
                 "id": "review-top-solder-no-pth",
-                "type": "top_solder_region",
+                "type": "CONFIRM_NO_TOP_THT",
                 "status": review_actions.get("review-top-solder-no-pth", "pending") if review_actions else "pending",
-                "title": "TOP 插件上锡区域待确认",
-                "description": "未检测到明确的 PTH 通孔引脚，请确认是否需要手动添加上锡透锡槽。",
+                "title": "未检测到 PTH 通孔 - 请确认无需上锡窗口",
+                "description": "未检测到明确的 PTH 通孔引脚。若本板确实无插件焊接需求，请确认放行；否则请重新指定钻孔文件。",
                 "confidence": 0.5,
-                "mandatory": False,
+                "mandatory": True,
             })
             return [], review_items
 
@@ -544,12 +544,12 @@ class FixtureGenerator:
         if top_silk is None or top_silk.is_empty:
             review_items.append({
                 "id": "review-spring-clip-no-gto",
-                "type": "front_panel_clip",
+                "type": "CONFIRM_NO_SPRING_CLIP_REQUIRED",
                 "status": review_actions.get("review-spring-clip-no-gto", "pending") if review_actions else "pending",
-                "title": "TOP 丝印层缺失",
-                "description": "未检测到顶层丝印 (GTO) 数据，无法自动生成前挡板弹簧卡安装孔。",
+                "title": "缺少 GTO 层 - 请确认无需弹簧卡安装孔",
+                "description": "未检测到顶层丝印 (GTO) 数据。若本板无需前挡板弹簧卡安装孔，请确认放行；否则请重新指定 GTO 图层。",
                 "confidence": 0.3,
-                "mandatory": False,
+                "mandatory": True,
             })
             return [], review_items
 

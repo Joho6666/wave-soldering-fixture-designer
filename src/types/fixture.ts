@@ -91,6 +91,7 @@ export interface DrcOverrideRecord {
   timestamp: string;
   originalSeverity: string;
   geometrySha256?: string;
+  status?: "active" | "expired" | "revoked";
 }
 
 export interface FixtureResult {

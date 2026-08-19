@@ -36,7 +36,7 @@ def test_spring_clips_missing_gto_generates_review():
     result = gen.generate({})
     clips = result["spring_clips"]
     assert len(clips) == 0
-    reviews = [r for r in result["reviewItems"] if r["type"] == "front_panel_clip"]
+    reviews = [r for r in result["reviewItems"] if r["type"] in ("front_panel_clip", "CONFIRM_NO_SPRING_CLIP_REQUIRED")]
     assert len(reviews) >= 1
 
 

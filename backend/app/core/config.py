@@ -155,3 +155,4 @@ def update_runtime_ai_settings(
 SOFTWARE_VERSION = "0.4.0"
 ALGORITHM_VERSION = "fixture-engine-0.4.0"
 RULE_PROFILE_VERSION = "1.0.0"
+ENABLE_OCR = False

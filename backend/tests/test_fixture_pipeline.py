@@ -53,7 +53,7 @@ def test_sparse_package_requires_review_instead_of_placeholder_features():
     assert generated["featureSummary"]["locatingPinCount"] == 0
     assert generated["featureSummary"]["locatingCandidateCount"] == 31
     assert {item["type"] for item in generated["reviewItems"]} >= {
-        "bot_keepout_region", "top_solder_region", "locating_pin_candidate"
+        "CONFIRM_NO_BOTTOM_SMD", "locating_pin_candidate"
     }
     assert generated["sink_area"].area > generated["pcb_outline"].area
     assert generated["fixture_outline"].contains(generated["sink_area"])

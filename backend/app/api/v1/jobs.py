@@ -205,9 +205,24 @@ async def complete_all_reviews(
         raise HTTPException(status_code=404, detail="任务不存在")
     
     reviews = (job.result_data or {}).get("reviewItems", [])
+    pending_mandatory = [
+        r for r in reviews
+        if r.get("mandatory", True) and r.get("status") == "pending"
+    ]
+    if pending_mandatory:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PENDING_REVIEWS_EXIST",
+                "message": f"仍有 {len(pending_mandatory)} 个强制审核项未处理",
+                "pendingIds": [r["id"] for r in pending_mandatory],
+            }
+        )
+
     review_actions = {
-        r["id"]: (r["status"] if r.get("status") in {"accepted", "rejected", "modified"} else "accepted")
+        r["id"]: r["status"]
         for r in reviews
+        if r.get("status") in {"accepted", "rejected", "modified"}
     }
     manual_pins = (job.result_data or {}).get("manualLocatingPins")
     add_log(job, "info", "用户确认完成全部审核，解锁并生成终版治具")
@@ -281,7 +296,30 @@ async def regenerate(
         job.parameters = request.parameters.dict()
     
     manual_pins = request.manualLocatingPins if request and request.manualLocatingPins is not None else (job.result_data or {}).get("manualLocatingPins")
-    
+
+    if manual_pins and job.result_data:
+        known_holes = {
+            h.get("id", ""): h
+            for h in (job.result_data.get("locatingCandidates") or [])
+        }
+        all_drill_ids = {c.get("drillId", "") for c in known_holes.values()}
+        for pin_id in manual_pins:
+            matched = None
+            for c in known_holes.values():
+                if c.get("drillId") == pin_id or c.get("id") == pin_id or f"pin-{c.get('drillId')}" == pin_id:
+                    matched = c
+                    break
+            if matched is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"定位销 '{pin_id}' 不存在于当前 PCB 钻孔列表中"
+                )
+            if matched.get("diameterMm", 0) < 2.0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"定位销 '{pin_id}' 孔径 {matched.get('diameterMm', 0):.2f}mm 过小 (最小 2.0mm)"
+                )
+
     existing_reviews = (job.result_data or {}).get("reviewItems", [])
     review_actions = {r["id"]: r["status"] for r in existing_reviews if r.get("status") in {"accepted", "rejected", "modified"}}
     if request and request.acceptedReviews:
@@ -367,7 +405,19 @@ def _compute_production_gate(job: Job) -> ProductionGateResult:
     reasons: list[str] = []
     result_data = job.result_data or {}
     overrides = result_data.get("drcOverrides", [])
-    overridden_ids = {o["issueId"] for o in overrides}
+    current_sha = result_data.get("geometrySha256")
+    overridden_ids = {
+        o["issueId"] for o in overrides
+        if o.get("status", "active") == "active"
+        and o.get("geometrySha256") == current_sha
+        and current_sha is not None
+    }
+    expired_count = sum(
+        1 for o in overrides
+        if o.get("geometrySha256") != current_sha or current_sha is None
+    )
+    if expired_count > 0:
+        reasons.append(f"{expired_count} 个 DRC 放行记录因几何变更已过期")
 
     issues = result_data.get("issues", [])
     blocking_drc = sum(
@@ -455,6 +505,7 @@ async def override_drc(
         "timestamp": datetime.now().isoformat(),
         "originalSeverity": original_severity,
         "geometrySha256": job.result_data.get("geometrySha256"),
+        "status": "active",
     }
     overrides.append(override_record)
 

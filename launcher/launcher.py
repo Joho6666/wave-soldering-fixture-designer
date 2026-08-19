@@ -78,7 +78,7 @@ def main():
             "app.main:app",
             "--host", host,
             "--port", str(port),
-            "--reload",
+            # Production mode: no --reload
         ],
         cwd=str(backend_dir),
         env=env,

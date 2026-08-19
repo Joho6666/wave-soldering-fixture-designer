@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
 
+from typing import Any
 from app.core.database import SessionLocal
 from app.models.job import Job
 from app.models.schemas import ErrorCode
@@ -17,6 +18,8 @@ from app.services.exporters.dxf_exporter import export_fixture_dxf, export_fixtu
 from app.services.fixture.generator import FixtureGenerator, FixtureGenerationError
 from app.core.config import SOFTWARE_VERSION, ALGORITHM_VERSION, RULE_PROFILE_VERSION
 from app.services.gerber.parser import GerberParser, GerberParseError
+from app.services.gerber.component_detector import detect_bot_components, detect_through_hole_clusters
+from app.core.config import ENABLE_OCR
 
 
 def add_log(job: Job, level: str, message: str):

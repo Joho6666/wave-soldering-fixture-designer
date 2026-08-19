@@ -46,6 +46,8 @@ class PCBGeometry:
     top_silkscreen: BaseGeometry | None = None
     bottom_silkscreen: BaseGeometry | None = None
     diagnostics: list[str] = field(default_factory=list)
+    bot_components: list[Any] = field(default_factory=list)
+    through_hole_clusters: list[Any] = field(default_factory=list)
 
     @property
     def bounds(self) -> tuple[float, float, float, float]:
