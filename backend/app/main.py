@@ -37,15 +37,39 @@ app.add_middleware(
 # 注册路由
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-@app.get("/")
-async def root():
-    """根路径"""
-    return {
-        "message": "WAVE-FIXTURE AI Backend API",
-        "version": settings.APP_VERSION,
-        "docs": "/docs"
-    }
+static_dir_env = os.environ.get("STATIC_DIR")
+if static_dir_env and os.path.isdir(static_dir_env):
+    static_dir = Path(static_dir_env)
+else:
+    static_dir = Path(__file__).resolve().parent.parent.parent / "dist"
+
+if static_dir.exists() and (static_dir / "index.html").exists():
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("redoc") or full_path.startswith("openapi.json"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = static_dir / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(static_dir / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        """根路径"""
+        return {
+            "message": "WAVE-FIXTURE AI Backend API",
+            "version": settings.APP_VERSION,
+            "docs": "/docs"
+        }
 
 
 if __name__ == "__main__":

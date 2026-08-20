@@ -133,7 +133,9 @@ def update_runtime_ai_settings(
     if ai_model is not None:
         settings.AI_MODEL = ai_model
     if ai_api_key is not None and ai_api_key.strip():
-        settings.AI_API_KEY = ai_api_key.strip()
+        clean_key = ai_api_key.strip()
+        if "****" not in clean_key:
+            settings.AI_API_KEY = clean_key
     if ai_timeout_ms is not None:
         settings.AI_TIMEOUT_MS = ai_timeout_ms
         
