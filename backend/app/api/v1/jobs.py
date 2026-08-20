@@ -225,10 +225,11 @@ async def complete_all_reviews(
         if r.get("status") in {"accepted", "rejected", "modified"}
     }
     manual_pins = (job.result_data or {}).get("manualLocatingPins")
+    custom_regions = (job.result_data or {}).get("customRegions", [])
     add_log(job, "info", "用户确认完成全部审核，解锁并生成终版治具")
     db.commit()
 
-    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions)
+    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions, custom_regions=custom_regions)
     db.refresh(job)
     return {"status": "ok", "message": "已完成全部审核并生成终版治具", "jobStatus": job.status}
 
@@ -255,10 +256,11 @@ async def _handle_review_action(job_id: str, review_id: str, action: str, modifi
         review_actions[review_id] = action
 
     manual_pins = (job.result_data or {}).get("manualLocatingPins")
+    custom_regions = (job.result_data or {}).get("customRegions", [])
     add_log(job, "info", f"审核项 [{review_id}] 操作: {action}")
     
     # 重新跑生成流水线
-    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions)
+    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions, custom_regions=custom_regions)
     db.refresh(job)
     
     return {"status": "ok", "action": action, "reviewId": review_id, "jobStatus": job.status}
@@ -296,6 +298,7 @@ async def regenerate(
         job.parameters = request.parameters.model_dump()
     
     manual_pins = request.manualLocatingPins if request and request.manualLocatingPins is not None else (job.result_data or {}).get("manualLocatingPins")
+    custom_regions = request.customRegions if request and request.customRegions is not None else (job.result_data or {}).get("customRegions", [])
 
     if manual_pins and job.result_data:
         known_holes = {
@@ -335,7 +338,7 @@ async def regenerate(
     add_log(job, "info", "开始重新生成治具")
     db.commit()
 
-    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions)
+    process_gerber_job(job.id, db, manual_pins=manual_pins, review_actions=review_actions, custom_regions=custom_regions)
     db.refresh(job)
 
     return JobResponse(

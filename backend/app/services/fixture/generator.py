@@ -216,12 +216,24 @@ class FixtureGenerator:
         w = params["handholdWidthMm"]
         h = params["handholdHeightMm"]
         overlap = params["handholdOverlapMm"]
-        radius = params["handholdCornerRadiusMm"]
+        radius = min(max(params.get("handholdCornerRadiusMm", 2.0), 0.0), w / 2 - 0.1, h / 2 - 0.1)
         center_y = (min_y + max_y) / 2
 
-        left = box(min_x - w + overlap, center_y - h / 2, min_x + overlap, center_y + h / 2).buffer(-radius, join_style="round").buffer(radius, join_style="round")
-        right = box(max_x - overlap, center_y - h / 2, max_x + w - overlap, center_y + h / 2).buffer(-radius, join_style="round").buffer(radius, join_style="round")
-        return [left, right]
+        left_box = box(min_x - w + overlap, center_y - h / 2, min_x + overlap, center_y + h / 2)
+        right_box = box(max_x - overlap, center_y - h / 2, max_x + w - overlap, center_y + h / 2)
+
+        if radius > 0:
+            left = left_box.buffer(-radius, join_style="round").buffer(radius, join_style="round")
+            right = right_box.buffer(-radius, join_style="round").buffer(radius, join_style="round")
+        else:
+            left, right = left_box, right_box
+
+        left = make_valid(left)
+        right = make_valid(right)
+        return [
+            max(left.geoms, key=lambda g: g.area) if isinstance(left, MultiPolygon) else left,
+            max(right.geoms, key=lambda g: g.area) if isinstance(right, MultiPolygon) else right,
+        ]
 
     def _clamp_holes(self, sink_region: Polygon, params: dict[str, float]) -> list[dict[str, Any]]:
         min_x, min_y, max_x, max_y = sink_region.bounds

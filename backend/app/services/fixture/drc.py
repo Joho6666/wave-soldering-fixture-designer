@@ -100,10 +100,32 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                     )
                 )
 
-    # 6. 压扣碰撞冲突 (CLAMP_HANDHOLD_COLLISION, CLAMP_RAIL_COLLISION, CLAMP_LOCATING_PIN_COLLISION)
+    # 6. 压扣碰撞冲突 (CLAMP_HANDHOLD_COLLISION, CLAMP_RAIL_COLLISION, CLAMP_LOCATING_PIN_COLLISION, CLAMP_FIXTURE_COLLISION, CLAMP_SINK_COLLISION)
     for clamp in fixture.clamp_holes:
         cp = Point(clamp["x"], clamp["y"])
         c_id = clamp.get("id", "clamp")
+        if not fixture.body.contains(cp):
+            issues.append(
+                _issue(
+                    "CLAMP_FIXTURE_COLLISION",
+                    "压扣孔超出治具外框",
+                    f"压扣孔 {c_id} ({clamp['x']:.1f}, {clamp['y']:.1f}) 超出治具主体边界。",
+                    "error",
+                    point=cp,
+                    object_id=f"{c_id}-body",
+                )
+            )
+        if fixture.sink_region.contains(cp):
+            issues.append(
+                _issue(
+                    "CLAMP_SINK_COLLISION",
+                    "压扣孔落入沉板区",
+                    f"压扣孔 {c_id} ({clamp['x']:.1f}, {clamp['y']:.1f}) 落在沉板台阶内部。",
+                    "error",
+                    point=cp,
+                    object_id=f"{c_id}-sink",
+                )
+            )
         for h_idx, handhold in enumerate(fixture.handholds):
             if handhold.contains(cp):
                 issues.append(

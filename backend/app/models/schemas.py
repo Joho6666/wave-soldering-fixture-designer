@@ -239,5 +239,6 @@ class RegenerateRequest(BaseModel):
     manualLocatingPins: Optional[List[str]] = None
     acceptedReviews: Optional[List[str]] = None
     rejectedReviews: Optional[List[str]] = None
+    customRegions: Optional[List[Dict[str, Any]]] = None
 
 
