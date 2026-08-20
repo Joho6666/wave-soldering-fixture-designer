@@ -370,6 +370,26 @@ def export_fixture_svg(layers_data: Dict[str, Any], output_path: str) -> str:
             svg_parts.append(_polygon_to_svg_path(geometry, color, f'{group_id}-{index + 1}'))
         svg_parts.append('</g>')
 
+    # 14. 尺寸标注 (Dimensions)
+    svg_parts.append('<g id="dimensions">')
+    if fixture_outline and not fixture_outline.is_empty:
+        fx0, fy0, fx1, fy1 = fixture_outline.bounds
+        fw_val = fx1 - fx0
+        fh_val = fy1 - fy0
+        # 总长标注 (X)
+        dim_y = fy1 + 8
+        svg_parts.append(f'<line x1="{fx0}" y1="{dim_y}" x2="{fx1}" y2="{dim_y}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<line x1="{fx0}" y1="{fy1 + 2}" x2="{fx0}" y2="{dim_y + 2}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<line x1="{fx1}" y1="{fy1 + 2}" x2="{fx1}" y2="{dim_y + 2}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<text x="{(fx0 + fx1)/2}" y="{dim_y - 2}" fill="#849396" font-size="4" font-family="monospace" text-anchor="middle">{fw_val:.1f} mm</text>')
+        # 总宽标注 (Y)
+        dim_x = fx1 + 8
+        svg_parts.append(f'<line x1="{dim_x}" y1="{fy0}" x2="{dim_x}" y2="{fy1}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<line x1="{fx1 + 2}" y1="{fy0}" x2="{dim_x + 2}" y2="{fy0}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<line x1="{fx1 + 2}" y1="{fy1}" x2="{dim_x + 2}" y2="{fy1}" stroke="#849396" stroke-width="0.3"/>')
+        svg_parts.append(f'<text x="{dim_x + 5}" y="{(fy0 + fy1)/2}" fill="#849396" font-size="4" font-family="monospace" text-anchor="middle" transform="rotate(90 {dim_x + 5} {(fy0 + fy1)/2})">{fh_val:.1f} mm</text>')
+    svg_parts.append('</g>')
+
     svg_parts.append('</svg>')
     
     svg_content = '\n'.join(svg_parts)
