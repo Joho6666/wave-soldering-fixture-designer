@@ -312,19 +312,25 @@ class FixtureGenerator:
         for hole in holes:
             score = 0.0
             reasons = []
-            
+            is_slot = getattr(hole, "kind", "hole") == "slot"
+
+            # 腰圆槽/长条铣槽过滤
+            if is_slot:
+                score -= 10.0
+                reasons.append("腰圆槽/长条孔无法作为定位销孔")
+
             # 孔径适中 (2.5mm ~ 4.5mm 最佳)
-            if 2.5 <= hole.diameter_mm <= 4.5:
+            if 2.5 <= hole.diameter_mm <= 4.5 and not is_slot:
                 score += 4.0
                 reasons.append("孔径适中适合打定位销 (2.5~4.5mm)")
-            elif 1.8 <= hole.diameter_mm < 2.5:
+            elif 1.8 <= hole.diameter_mm < 2.5 and not is_slot:
                 score += 2.0
-            elif hole.diameter_mm > 5.0:
+            elif hole.diameter_mm > 5.0 and not is_slot:
                 score -= 3.0
                 reasons.append("孔径过大可能为螺丝固定孔")
 
             # NPTH 非金属化孔优先
-            if hole.plated is False:
+            if hole.plated is False and not is_slot:
                 score += 4.0
                 reasons.append("非金属化孔 (NPTH)")
             elif hole.plated is True:
@@ -332,11 +338,11 @@ class FixtureGenerator:
 
             # 靠近板边角落
             dist_to_edge = min(hole.x - min_x, max_x - hole.x, hole.y - min_y, max_y - hole.y)
-            if dist_to_edge <= 15.0:
+            if dist_to_edge <= 15.0 and not is_slot:
                 score += 3.0
                 reasons.append("靠近边缘工艺边区域")
 
-            eligible = score >= 4.0 or (hole.plated is False and hole.diameter_mm >= 2.0)
+            eligible = not is_slot and (score >= 4.0 or (hole.plated is False and hole.diameter_mm >= 2.0))
             
             cand = {
                 "id": f"pin-cand-{hole.id}",
