@@ -3,7 +3,7 @@
   "boardHeightMm": 48.26,
   "holeCount": 31,
   "keepoutRegionCount": 0,
-  "solderRegionCount": 6,
+  "solderRegionCount": 5,
   "fixtureWidthMm": 75.0,
   "fixtureHeightMm": 120.0,
   "engineeringNotes": [

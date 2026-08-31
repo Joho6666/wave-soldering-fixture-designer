@@ -1,6 +1,22 @@
 {
+  "caseId": "CASE-001",
   "case_id": "CASE-001",
   "description": "Standard demo board — placeholder for engineer-provided golden sample",
+  "boardType": "single",
+  "source": "synthetic",
   "status": "awaiting_manual_dxf",
-  "notes": "Place manual_fixture.dxf and gerber.zip here to enable comparison"
+  "expected": {
+    "keepoutCount": null,
+    "solderOpeningCount": null,
+    "pinCount": 2
+  },
+  "metrics": {
+    "iou": null,
+    "hausdorffMm": null,
+    "holePositionErrorMm": null,
+    "openingAreaError": null,
+    "falsePositiveRegion": null,
+    "falseNegativeRegion": null
+  },
+  "notes": "Place manual_fixture.dxf and gerber.zip here to enable comparison. Count fields stay null until an engineer DXF exists."
 }

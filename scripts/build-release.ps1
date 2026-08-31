@@ -79,7 +79,7 @@ if (Test-Path "$ProjectRoot\validation") {
 }
 
 # Root docs
-@("ENGINEERING_STATUS.md", "ENGINEERING_AUDIT.md", "PRODUCTION_READINESS.md", "README.md") | ForEach-Object {
+@("ENGINEERING_STATUS.md", "ENGINEERING_AUDIT.md", "PRODUCTION_READINESS.md", "README.md", "IMPLEMENTATION_SUMMARY.md", "SEMANTIC_ENGINE.md", "VALIDATION_STATUS.md", "NEXT_ROUND.md", "LICENSE") | ForEach-Object {
     $src = Join-Path $ProjectRoot $_
     if (Test-Path $src) {
         Copy-Item -LiteralPath $src -Destination (Join-Path $OutputDir $_)

@@ -11,7 +11,7 @@ body {
   padding: 0;
   background-color: #0d1516;
   color: #dce4e5;
-  font-family: 'Inter', sans-serif;
+  font-family: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -100,8 +100,9 @@ body {
   box-shadow: 0 0 20px rgba(147, 0, 10, 0.3);
 }
 
-/* Material Symbols sizing helper */
+/* Offline: no Google Fonts CDN. Ligature icons degrade if the font is not local. */
 .material-symbols-outlined {
+  font-family: "Material Symbols Outlined", system-ui, sans-serif;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
 }

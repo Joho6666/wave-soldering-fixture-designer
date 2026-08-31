@@ -29,6 +29,17 @@ class ParameterPatch(BaseModel):
     keepoutInnerFilletMm: FiniteFloat | None = Field(None, ge=0, le=20)
     solderMinOuterDiameterMm: FiniteFloat | None = Field(None, gt=0, le=30)
     fixtureSizeRoundStepMm: FiniteFloat | None = Field(None, gt=0, le=50)
+    palletThicknessMm: FiniteFloat | None = Field(None, gt=0, le=50)
+    pocketFloorThicknessMm: FiniteFloat | None = Field(None, gt=0, le=20)
+    componentVerticalClearanceMm: FiniteFloat | None = Field(None, ge=0, le=20)
+    defaultPocketDepthMm: FiniteFloat | None = Field(None, gt=0, le=50)
+    solderMinOpeningWidthMm: FiniteFloat | None = Field(None, gt=0, le=30)
+    solderOpeningMergeDistanceMm: FiniteFloat | None = Field(None, ge=0, le=30)
+    minPinHoleDiameterMm: FiniteFloat | None = Field(None, gt=0, le=20)
+    maxPinHoleDiameterMm: FiniteFloat | None = Field(None, gt=0, le=20)
+    minPinSeparationMm: FiniteFloat | None = Field(None, gt=0, le=500)
+    barrierMountHoleDiameterMm: FiniteFloat | None = Field(None, gt=0, le=20)
+    clampPinClearanceMm: FiniteFloat | None = Field(None, gt=0, le=50)
 
     def values(self) -> dict:
         return self.model_dump(exclude_none=True)

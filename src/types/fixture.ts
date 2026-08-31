@@ -21,6 +21,14 @@ export interface FixtureParameters {
   keepoutInnerFilletMm?: number;
   solderMinOuterDiameterMm?: number;
   fixtureSizeRoundStepMm?: number;
+  palletThicknessMm?: number;
+  pocketFloorThicknessMm?: number;
+  componentVerticalClearanceMm?: number;
+  defaultPocketDepthMm?: number;
+  solderMinOpeningWidthMm?: number;
+  minPinHoleDiameterMm?: number;
+  maxPinHoleDiameterMm?: number;
+  minPinSeparationMm?: number;
 }
 
 export const DEFAULT_PARAMETERS: FixtureParameters = {
@@ -44,6 +52,14 @@ export const DEFAULT_PARAMETERS: FixtureParameters = {
   keepoutInnerFilletMm: 1.5,
   solderMinOuterDiameterMm: 3.0,
   fixtureSizeRoundStepMm: 5.0,
+  palletThicknessMm: 10.0,
+  pocketFloorThicknessMm: 2.0,
+  componentVerticalClearanceMm: 0.5,
+  defaultPocketDepthMm: 2.0,
+  solderMinOpeningWidthMm: 1.5,
+  minPinHoleDiameterMm: 2.0,
+  maxPinHoleDiameterMm: 4.5,
+  minPinSeparationMm: 15.0,
 };
 
 export interface ReviewItem {
@@ -121,6 +137,8 @@ export interface FixtureResult {
   algorithmVersion?: string;
   softwareVersion?: string;
   ruleProfileVersion?: string;
+  regionAudit?: Array<Record<string, unknown>>;
+  customRegions?: Array<Record<string, unknown>>;
   status: "completed" | "review_required" | "failed";
 }
 

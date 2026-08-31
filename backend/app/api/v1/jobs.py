@@ -39,6 +39,16 @@ from app.tasks.process_job import add_log, process_gerber_job, process_job_backg
 router = APIRouter()
 
 
+def _safe_upload_name(filename: str | None) -> str:
+    raw = (filename or "").replace("\\", "/")
+    name = Path(raw).name.strip()
+    if not name or name in {".", ".."} or ".." in Path(raw).parts:
+        raise HTTPException(status_code=400, detail="上传文件名无效。")
+    if not name.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="仅接受 Gerber ZIP 制造文件包。")
+    return name
+
+
 @router.post("/jobs", response_model=JobResponse)
 async def create_job(
     background_tasks: BackgroundTasks,
@@ -46,17 +56,30 @@ async def create_job(
     db: Session = Depends(get_db)
 ):
     """创建并提交 Gerber 治具设计任务。"""
+    safe_name = _safe_upload_name(file.filename)
     job_id = f"job-{uuid.uuid4().hex[:12]}"
     job_dir = Path(settings.UPLOAD_DIR) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
-    
-    file_path = job_dir / file.filename
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+
+    file_path = job_dir / safe_name
+    written = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > settings.MAX_UPLOAD_SIZE:
+                    raise HTTPException(status_code=413, detail="上传文件超过 100MB 限制。")
+                buffer.write(chunk)
+    except HTTPException:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
     
     job = Job(
         id=job_id,
-        name=file.filename,
+        name=safe_name,
         status="parsing",
         progress=5,
         current_step="已接收文件，正在解压并准备解析",
@@ -65,7 +88,7 @@ async def create_job(
         logs=[{
             "time": datetime.now().strftime("%H:%M:%S"),
             "level": "info",
-            "message": f"创建任务: {file.filename} (ID: {job_id})"
+            "message": f"创建任务: {safe_name} (ID: {job_id})"
         }]
     )
     

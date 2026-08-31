@@ -153,15 +153,16 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
         for pin in fixture.locating_pins:
             p_id = pin.get("id", "pin")
             dist = math.hypot(clamp["x"] - pin["x"], clamp["y"] - pin["y"])
-            if dist < 10.0:
+            clamp_pin_clearance = float(params.get("clampPinClearanceMm", 10.0))
+            if dist < clamp_pin_clearance:
                 issues.append(
                     _issue(
                         "CLAMP_LOCATING_PIN_COLLISION",
                         "压扣与定位销距离过近",
-                        f"压扣 {c_id} 与定位销 {p_id} 间距 ({dist:.1f}mm < 10mm) 存在机械干涉风险。",
+                        f"压扣 {c_id} 与定位销 {p_id} 间距 ({dist:.1f}mm < {clamp_pin_clearance:.1f}mm) 存在机械干涉风险。",
                         "warning",
                         current_value=dist,
-                        required_value=10.0,
+                        required_value=clamp_pin_clearance,
                         unit="mm",
                         point=cp,
                         object_id=f"{c_id}-{p_id}",
@@ -289,6 +290,128 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                         object_id=f"solder-web-{i+1}-{j+1}",
                     )
                 )
+
+    issues.extend(_semantic_drc(fixture, params))
+    return issues
+
+
+def _semantic_drc(fixture: FixtureGeometry, params: dict) -> list[dict]:
+    issues: list[dict] = []
+    pallet = float(params.get("palletThicknessMm", 10.0))
+    floor_min = float(params.get("pocketFloorThicknessMm", 2.0))
+    min_opening = float(params.get("solderMinOpeningWidthMm", 1.5))
+    min_span = float(params.get("minPinSeparationMm", 15.0))
+
+    keepout_meta = list(getattr(fixture, "keepout_region_meta", []) or [])
+    solder_meta = list(getattr(fixture, "solder_region_meta", []) or [])
+
+    for meta in keepout_meta:
+        depth = None
+        height = None
+        if meta.parameters:
+            depth = meta.parameters.get("pocketDepthMm")
+            height = meta.parameters.get("componentHeightMm")
+        if height is None:
+            issues.append(
+                _issue(
+                    "COMPONENT_HEIGHT_UNKNOWN",
+                    "元件高度未知",
+                    f"避位区域 {meta.id} 缺少元件高度，已使用默认口袋深度，置信度下降。",
+                    "warning",
+                    object_id=meta.id,
+                )
+            )
+        if depth is not None and pallet - float(depth) < floor_min:
+            remaining = pallet - float(depth)
+            issues.append(
+                _issue(
+                    "POCKET_FLOOR_TOO_THIN",
+                    "口袋铣削后底板过薄",
+                    f"避位 {meta.id} 口袋深度 {float(depth):.2f}mm 后剩余底板 {remaining:.2f}mm，低于 {floor_min:.2f}mm。",
+                    "blocking",
+                    current_value=remaining,
+                    required_value=floor_min,
+                    unit="mm",
+                    object_id=meta.id,
+                )
+            )
+        if meta.confidence < 0.70 and meta.source_type == "gerber_fallback":
+            issues.append(
+                _issue(
+                    "SEMANTIC_CONFIDENCE_LOW",
+                    "关键区域来自低置信度几何回退",
+                    f"区域 {meta.id} 来源 {meta.source_type}，置信度 {meta.confidence:.2f}。",
+                    "warning",
+                    current_value=meta.confidence,
+                    required_value=0.70,
+                    object_id=meta.id,
+                )
+            )
+
+    for meta in solder_meta:
+        geom = meta.geometry
+        if geom is None or geom.is_empty:
+            continue
+        minx, miny, maxx, maxy = geom.bounds
+        width = min(maxx - minx, maxy - miny)
+        if width + 1e-9 < min_opening:
+            issues.append(
+                _issue(
+                    "SOLDER_OPENING_TOO_NARROW",
+                    "上锡窗口宽度低于工艺限制",
+                    f"窗口 {meta.id} 最小外接宽度 {width:.2f}mm，低于 {min_opening:.2f}mm。",
+                    "error",
+                    current_value=width,
+                    required_value=min_opening,
+                    unit="mm",
+                    object_id=meta.id,
+                )
+            )
+        if meta.confidence < 0.70 and meta.source_type == "gerber_fallback":
+            issues.append(
+                _issue(
+                    "SEMANTIC_CONFIDENCE_LOW",
+                    "关键区域来自低置信度几何回退",
+                    f"上锡窗口 {meta.id} 来源 {meta.source_type}，置信度 {meta.confidence:.2f}。",
+                    "warning",
+                    current_value=meta.confidence,
+                    required_value=0.70,
+                    object_id=meta.id,
+                )
+            )
+
+    pins = fixture.locating_pins or []
+    if len(pins) >= 2:
+        span = 0.0
+        for i in range(len(pins)):
+            for j in range(i + 1, len(pins)):
+                d = math.hypot(pins[i]["x"] - pins[j]["x"], pins[i]["y"] - pins[j]["y"])
+                span = max(span, d)
+        if span < min_span:
+            issues.append(
+                _issue(
+                    "PIN_SPAN_TOO_SMALL",
+                    "定位孔跨距不足",
+                    f"已选定位销最大跨距 {span:.2f}mm，低于 {min_span:.2f}mm。",
+                    "warning",
+                    current_value=span,
+                    required_value=min_span,
+                    unit="mm",
+                    object_id="locating-pins",
+                )
+            )
+
+    pcb = fixture.pcb
+    for conflict in getattr(pcb, "semantic_conflicts", []) or []:
+        issues.append(
+            _issue(
+                "COMPONENT_DATA_CONFLICT",
+                "元件数据源冲突",
+                conflict.get("reason", "PnP / Gerber / BOM 数据明显冲突"),
+                "error",
+                object_id=str(conflict.get("refdes") or conflict.get("pnpId") or "semantic"),
+            )
+        )
 
     return issues
 
