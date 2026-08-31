@@ -34,6 +34,8 @@ interface BackendFixtureResult {
   };
   reviewItems?: FixtureResult["reviewItems"];
   locatingCandidates?: FixtureResult["locatingCandidates"];
+  regionAudit?: FixtureResult["regionAudit"];
+  customRegions?: FixtureResult["customRegions"];
   status?: "completed" | "review_required" | "failed";
   geometrySha256?: string;
   issues: Array<{
@@ -146,6 +148,8 @@ function toFixtureResult(
     algorithmVersion: (result as any).algorithmVersion,
     softwareVersion: (result as any).softwareVersion,
     ruleProfileVersion: (result as any).ruleProfileVersion,
+    regionAudit: (result as any).regionAudit || [],
+    customRegions: (result as any).customRegions || [],
     status: (result.status as any) || (job.status as any) || "completed",
   };
 }
@@ -568,7 +572,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const job = get().currentProject;
     if (!job) return;
     await fixtureApi.confirmLayers(job.id, layers);
-    set({ analysis: { ...get().analysis, layers: layers.map((layer) => ({ ...layer, confirmed: true })) }, isLayerConfirmModalOpen: false });
+    set({
+      analysis: { ...get().analysis, layers: layers.map((layer) => ({ ...layer, confirmed: true })) },
+      isLayerConfirmModalOpen: false,
+      jobStatus: "parsing",
+    });
     await get().hydrateJob(job.id);
     get().showToast("Gerber 图层映射已提交，后端重新出图中", "success");
   },

@@ -5,14 +5,16 @@ import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.version import ALGORITHM_VERSION, APP_VERSION, RULE_PROFILE_VERSION, SOFTWARE_VERSION  # noqa: F401
+
 
 class Settings(BaseSettings):
     """应用设置"""
     
     # Application
     APP_NAME: str = "WAVE-FIXTURE AI Backend"
-    APP_VERSION: str = "0.1.0"
-    DEBUG: bool = True
+    APP_VERSION: str = APP_VERSION
+    DEBUG: bool = False
     PORT: int = 8000
     HOST: str = "0.0.0.0"
     DEBUG_GEOMETRY: bool = False
@@ -154,7 +156,4 @@ def update_runtime_ai_settings(
     }
 
 
-SOFTWARE_VERSION = "0.4.0"
-ALGORITHM_VERSION = "fixture-engine-0.4.0"
-RULE_PROFILE_VERSION = "1.0.0"
 ENABLE_OCR = False

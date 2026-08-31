@@ -19,8 +19,8 @@ validation/
 
 ## Usage
 ```bash
-cd backend
 python -m validation.run_all
+# 在仓库根目录运行。validation/ 不在 backend/ 内。
 ```
 
 ## Adding a New Case

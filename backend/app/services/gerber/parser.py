@@ -18,6 +18,8 @@ from shapely.ops import polygonize, unary_union, linemerge
 
 from app.models.geometry import DrillHit, PCBGeometry
 from app.models.schemas import ErrorCode
+from app.services.bom.parser import looks_like_bom_filename, parse_bom_members
+from app.services.pnp.parser import looks_like_pnp_filename, parse_pnp_members
 
 
 GERBER_EXTENSIONS = {".gbr", ".ger", ".gko", ".gml", ".gm1", ".gtl", ".gbl", ".gto", ".gbo", ".gts", ".gbs"}
@@ -79,6 +81,9 @@ class GerberParser:
             suffix = Path(filename).suffix.lower()
             layer_id = self._stable_id("layer", filename, data)
             requested_type = confirmed_map.get(filename.lower())
+
+            if looks_like_pnp_filename(filename) or looks_like_bom_filename(filename):
+                continue
 
             if suffix in DRILL_EXTENSIONS or self._is_excellon_content(data):
                 try:
@@ -170,6 +175,12 @@ class GerberParser:
         )
 
         min_confidence = min((l["confidence"] for l in layers if l["type"] != "unknown"), default=1.0)
+        pnp_placements = parse_pnp_members(members)
+        bom_rows = parse_bom_members(members)
+        if pnp_placements:
+            diagnostics.append(f"已解析 PnP/CPL 贴片坐标 {len(pnp_placements)} 条。")
+        if bom_rows:
+            diagnostics.append(f"已解析 BOM {len(bom_rows)} 行。")
 
         return {
             "pcb_geometry": pcb,
@@ -187,6 +198,10 @@ class GerberParser:
             "sourceSha256": source_digest,
             "geometrySha256": geometry_digest,
             "requires_layer_confirmation": min_confidence < 0.8,
+            "pnpPlacements": [p.to_dict() for p in pnp_placements],
+            "bomRows": [row.to_dict() for row in bom_rows],
+            "_pnp_objects": pnp_placements,
+            "_bom_objects": bom_rows,
         }
 
     def _is_excellon_content(self, data: bytes) -> bool:
@@ -324,6 +339,13 @@ class GerberParser:
                 tool_id = getattr(obj.tool, "name", f"T{index+1}") if hasattr(obj, "tool") else None
                 plated = getattr(obj, "plated", None)
                 kind = "slot" if hasattr(obj, "x2") and hasattr(obj, "y2") else "hole"
+                slot_width = None
+                slot_length = None
+                if kind == "slot":
+                    x2 = float(getattr(obj, "x2", x))
+                    y2 = float(getattr(obj, "y2", y))
+                    slot_length = round(math.hypot(x2 - x, y2 - y), 4)
+                    slot_width = round(dia, 4)
 
                 hits.append(DrillHit(
                     id=f"drill-{layer_id[:6]}-{index+1}",
@@ -334,6 +356,8 @@ class GerberParser:
                     tool_id=str(tool_id) if tool_id else None,
                     source_layer_id=layer_id,
                     kind=kind,
+                    slot_width_mm=slot_width,
+                    slot_length_mm=slot_length,
                 ))
             except Exception:
                 continue

@@ -27,7 +27,7 @@ export const DropZone: React.FC = () => {
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      showToast(`不支持的文件格式: ${file.name}，请上传 Gerber / DXF / ZIP 文件`, "error");
+      showToast(`不支持的文件格式: ${file.name}，请上传 Gerber ZIP 制造文件包`, "error");
       return;
     }
 

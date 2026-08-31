@@ -212,6 +212,63 @@ export const ParameterDrawer: React.FC = () => {
           </div>
         </div>
 
+        <div>
+          <h3 className="font-label-caps text-label-caps text-primary-container uppercase tracking-wider mb-3">
+            口袋深度与板厚
+          </h3>
+          <div className="space-y-3 font-data-mono text-body-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="flex justify-between text-on-surface-variant mb-1">
+                  <span>治具板厚</span>
+                  <span className="text-on-surface font-bold">{(formParams.palletThicknessMm ?? 10).toFixed(1)}mm</span>
+                </div>
+                <input type="number" step="0.5" min="4" max="30" value={formParams.palletThicknessMm ?? 10}
+                  onChange={(e) => setFormParams({ ...formParams, palletThicknessMm: parseFloat(e.target.value) || 10 })}
+                  className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none" />
+              </div>
+              <div>
+                <div className="flex justify-between text-on-surface-variant mb-1">
+                  <span>口袋底板最小厚度</span>
+                  <span className="text-on-surface font-bold">{(formParams.pocketFloorThicknessMm ?? 2).toFixed(1)}mm</span>
+                </div>
+                <input type="number" step="0.1" min="0.5" max="8" value={formParams.pocketFloorThicknessMm ?? 2}
+                  onChange={(e) => setFormParams({ ...formParams, pocketFloorThicknessMm: parseFloat(e.target.value) || 2 })}
+                  className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="flex justify-between text-on-surface-variant mb-1">
+                  <span>元件垂直间隙</span>
+                  <span className="text-on-surface font-bold">{(formParams.componentVerticalClearanceMm ?? 0.5).toFixed(2)}mm</span>
+                </div>
+                <input type="number" step="0.1" min="0" max="5" value={formParams.componentVerticalClearanceMm ?? 0.5}
+                  onChange={(e) => setFormParams({ ...formParams, componentVerticalClearanceMm: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none" />
+              </div>
+              <div>
+                <div className="flex justify-between text-on-surface-variant mb-1">
+                  <span>默认口袋深度</span>
+                  <span className="text-on-surface font-bold">{(formParams.defaultPocketDepthMm ?? 2).toFixed(1)}mm</span>
+                </div>
+                <input type="number" step="0.1" min="0.5" max="12" value={formParams.defaultPocketDepthMm ?? 2}
+                  onChange={(e) => setFormParams({ ...formParams, defaultPocketDepthMm: parseFloat(e.target.value) || 2 })}
+                  className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none" />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-on-surface-variant mb-1">
+                <span>定位销最小孔径</span>
+                <span className="text-on-surface font-bold">{(formParams.minPinHoleDiameterMm ?? 2).toFixed(1)}mm</span>
+              </div>
+              <input type="number" step="0.1" min="1.5" max="4" value={formParams.minPinHoleDiameterMm ?? 2}
+                onChange={(e) => setFormParams({ ...formParams, minPinHoleDiameterMm: parseFloat(e.target.value) || 2 })}
+                className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none" />
+            </div>
+          </div>
+        </div>
+
         {/* 治具外形与夹持 */}
         <div>
           <h3 className="font-label-caps text-label-caps text-primary-container uppercase tracking-wider mb-3">

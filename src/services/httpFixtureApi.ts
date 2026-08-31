@@ -7,6 +7,21 @@ import { AiCommandRequest, AiCommandResponse } from "../types/ai";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
+function formatApiError(errorData: any, status: number, statusText: string): string {
+  const detail = errorData?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string" && detail.message.trim()) return detail.message;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (typeof errorData?.message === "string" && errorData.message.trim()) return errorData.message;
+  return `HTTP ${status}: ${statusText}`;
+}
+
 class HttpFixtureApiService implements FixtureApi {
   private async request<T>(
     endpoint: string,
@@ -23,9 +38,7 @@ class HttpFixtureApiService implements FixtureApi {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`
-      );
+      throw new Error(formatApiError(errorData, response.status, response.statusText));
     }
 
     return response.json();
@@ -42,7 +55,7 @@ class HttpFixtureApiService implements FixtureApi {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Upload failed: ${response.statusText}`);
+      throw new Error(formatApiError(errorData, response.status, response.statusText));
     }
 
     return response.json();
@@ -93,7 +106,7 @@ class HttpFixtureApiService implements FixtureApi {
     const response = await fetch(`${API_BASE_URL}/api/jobs/${id}/result.dxf`);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Download failed: ${response.statusText}`);
+      throw new Error(formatApiError(errorData, response.status, response.statusText));
     }
     return response.blob();
   }
@@ -148,7 +161,7 @@ class HttpFixtureApiService implements FixtureApi {
     const response = await fetch(`${API_BASE_URL}/api/jobs/${id}/preview.dxf`);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Preview DXF download failed: ${response.statusText}`);
+      throw new Error(formatApiError(errorData, response.status, response.statusText));
     }
     return response.blob();
   }

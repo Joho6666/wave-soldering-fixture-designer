@@ -1,25 +1,25 @@
 """
 Wave Soldering Fixture Designer — Local Launcher
-Starts the FastAPI backend and opens the browser to the local UI.
+Starts the FastAPI backend and serves the built frontend from dist/.
 
-Usage:
-    python launcher.py
+Usage (from repository root):
+    python launcher/launcher.py
 
 Requirements:
-    - Python 3.11+ with dependencies from backend/requirements.txt installed
-    - Frontend built to dist/ (npm run build)
+    - Python 3.11+ with backend/.venv and backend/requirements.txt
+    - Frontend built to dist/ (`npm run build`)
 """
+from __future__ import annotations
+
 import os
 import sys
 import time
-import signal
 import subprocess
 import webbrowser
 from pathlib import Path
 
 
 def find_project_root() -> Path:
-    """Find the project root directory relative to this script."""
     script_dir = Path(__file__).resolve().parent
     if (script_dir.parent / "backend").exists():
         return script_dir.parent
@@ -30,7 +30,6 @@ def find_project_root() -> Path:
 
 
 def find_python(project_root: Path) -> str:
-    """Find Python executable, preferring the venv."""
     venv_python = project_root / "backend" / ".venv" / "Scripts" / "python.exe"
     if venv_python.exists():
         return str(venv_python)
@@ -40,11 +39,21 @@ def find_python(project_root: Path) -> str:
     return sys.executable
 
 
+def stop_process(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=5)
+
+
 def main():
     project_root = find_project_root()
     backend_dir = project_root / "backend"
     dist_dir = project_root / "dist"
-
     python_exe = find_python(project_root)
     host = "127.0.0.1"
     port = 8000
@@ -58,19 +67,24 @@ def main():
     print(f"  Server:  http://{host}:{port}")
     print()
 
-    if dist_dir.exists():
-        os.environ["STATIC_DIR"] = str(dist_dir)
-        print(f"  Frontend: Serving from {dist_dir}")
-    else:
-        print("  Frontend: dist/ not found — run 'npm run build' first")
-        print("            Or access frontend dev server at http://localhost:3000")
+    if not dist_dir.exists() or not (dist_dir / "index.html").exists():
+        print("  Frontend dist/ is missing.")
+        print("  Build the UI first:")
+        print("      npm ci")
+        print("      npm run build")
+        print("  Then run this launcher again.")
+        sys.exit(1)
 
+    os.environ["STATIC_DIR"] = str(dist_dir)
+    print(f"  Frontend: {dist_dir}")
     print()
-    print("Starting backend server...")
+    print("Starting backend + static UI...")
     print("Press Ctrl+C to stop.\n")
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(backend_dir)
+    env["STATIC_DIR"] = str(dist_dir)
+    env.setdefault("DEBUG", "false")
 
     proc = subprocess.Popen(
         [
@@ -78,29 +92,23 @@ def main():
             "app.main:app",
             "--host", host,
             "--port", str(port),
-            # Production mode: no --reload
         ],
         cwd=str(backend_dir),
         env=env,
     )
 
-    time.sleep(2)
-
-    url = f"http://{host}:{port}"
-    if dist_dir.exists():
+    try:
+        time.sleep(2)
+        if proc.poll() is not None:
+            print("Backend failed to start. Check Python dependencies in backend/.venv")
+            sys.exit(proc.returncode or 1)
+        url = f"http://{host}:{port}"
         print(f"Opening browser at {url} ...")
         webbrowser.open(url)
-    else:
-        dev_url = "http://localhost:3000"
-        print(f"Opening browser at {dev_url} (dev server) ...")
-        webbrowser.open(dev_url)
-
-    try:
         proc.wait()
     except KeyboardInterrupt:
         print("\nShutting down...")
-        proc.send_signal(signal.SIGTERM)
-        proc.wait(timeout=5)
+        stop_process(proc)
         print("Server stopped.")
 
 

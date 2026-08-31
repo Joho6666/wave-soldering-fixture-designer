@@ -1,6 +1,8 @@
 # WAVE-FIXTURE AI Backend
 
-波峰焊治具智能设计系统 - 后端 API
+波峰焊治具智能设计系统 - 后端 API（v0.5 Semantic Fixture Engine）
+
+版本：`0.5.0` / `fixture-engine-0.5.0` / rules `1.1.0`（`app/core/version.py`）
 
 ## 技术栈
 
@@ -82,27 +84,21 @@ backend/
 └── requirements.txt
 ```
 
-## 开发状态
+## 开发状态（v0.5）
 
-### ✅ 已完成
-- [x] FastAPI 项目架构
-- [x] 数据库模型和 Schema
-- [x] 核心 API 端点
-- [x] 文件上传和存储
-- [x] CORS 配置
-- [x] API 文档
+### 已完成
+- Gerber / Excellon / X2 解析
+- PnP + BOM 解析（可选附件）
+- Semantic PCB Model 2.0
+- ProcessProfile 驱动的治具生成
+- DRC + Production Gate + SHA override
+- DXF R2018 / SVG
+- pytest 见仓库根目录 VALIDATION_STATUS.md
 
-### 🚧 进行中
-- [ ] Gerber 解析服务
-- [ ] 治具生成算法
-- [ ] SVG/DXF 导出
-- [ ] Celery 异步任务
-
-### 📋 待开发
-- [ ] DRC 检查
-- [ ] 单元测试
-- [ ] 性能优化
-- [ ] Docker 部署
+### 明确未做
+- Celery 异步队列（当前 BackgroundTasks）
+- 拼板 / 波峰方向感知开窗 / 3D CAM
+- 真实客户 Gerber 与人工 DXF 黄金对比
 
 ## 前端对接
 

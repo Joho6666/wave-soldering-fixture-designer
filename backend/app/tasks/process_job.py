@@ -3,8 +3,6 @@
 """
 from __future__ import annotations
 
-import json
-import os
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +16,7 @@ from app.services.exporters.dxf_exporter import export_fixture_dxf, export_fixtu
 from app.services.fixture.generator import FixtureGenerator, FixtureGenerationError
 from app.core.config import SOFTWARE_VERSION, ALGORITHM_VERSION, RULE_PROFILE_VERSION
 from app.services.gerber.parser import GerberParser, GerberParseError
-from app.services.gerber.component_detector import detect_bot_components, detect_through_hole_clusters
+from app.services.gerber.semantic_builder import build_semantic_model
 from app.core.config import ENABLE_OCR
 
 
@@ -91,12 +89,18 @@ def process_gerber_job(
             return
 
         pcb_geom = analysis_result.pop("pcb_geometry")
-        pcb_geom.bot_components = detect_bot_components(pcb_geom)
-        pcb_geom.through_hole_clusters = detect_through_hole_clusters(pcb_geom)
+        pnp_objects = analysis_result.pop("_pnp_objects", []) or []
+        bom_objects = analysis_result.pop("_bom_objects", []) or []
+        build_semantic_model(pcb_geom, pnp_placements=pnp_objects, bom_rows=bom_objects)
         job.analysis_data = analysis_result
         job.progress = 40
         job.current_step = f"PCB 外形闭合成功 ({pcb_geom.width:.1f}×{pcb_geom.height:.1f}mm), 提取真实钻孔 {len(pcb_geom.holes)} 个"
         add_log(job, "info", f"PCB 外形尺寸: {pcb_geom.width:.2f} × {pcb_geom.height:.2f} mm, 钻孔数: {len(pcb_geom.holes)}")
+        add_log(
+            job,
+            "info",
+            f"语义层: 元件 {len(pcb_geom.components)} 个, THT 组件 {len(pcb_geom.through_hole_components)} 个, PnP {len(pnp_objects)} 条, BOM {len(bom_objects)} 行",
+        )
         db.commit()
 
         # Step 2: 治具几何生成
@@ -175,6 +179,7 @@ def process_gerber_job(
             "softwareVersion": SOFTWARE_VERSION,
             "ruleProfileVersion": RULE_PROFILE_VERSION,
             "generatedAt": datetime.now().isoformat(),
+            "regionAudit": fixture_data.get("regionAudit", []),
         }
         
         add_log(job, "info", f"治具工程出图完成，最终状态: {job.status}")

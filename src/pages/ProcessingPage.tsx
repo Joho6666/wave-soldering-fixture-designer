@@ -53,6 +53,7 @@ export const ProcessingPage: React.FC = () => {
           if (!cancelled) {
             toggleLayerConfirmModal(true);
           }
+          timer = window.setTimeout(poll, 800);
           return;
         }
 

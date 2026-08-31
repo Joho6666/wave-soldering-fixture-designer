@@ -113,6 +113,20 @@ class FixtureParameters(BaseModel):
     keepoutInnerFilletMm: float = 1.5
     solderMinOuterDiameterMm: float = 3.0
     fixtureSizeRoundStepMm: float = 5.0
+    palletThicknessMm: float = 10.0
+    pocketFloorThicknessMm: float = 2.0
+    componentVerticalClearanceMm: float = 0.5
+    defaultPocketDepthMm: float = 2.0
+    solderMinOpeningWidthMm: float = 1.5
+    solderOpeningMergeDistanceMm: float = 2.0
+    minPinHoleDiameterMm: float = 2.0
+    maxPinHoleDiameterMm: float = 4.5
+    preferredNPTH: bool = True
+    minPinSeparationMm: float = 15.0
+    barrierMountHoleDiameterMm: float = 3.2
+    clampPinClearanceMm: float = 10.0
+    waveDirection: str = "+X"
+    conveyorDirection: str = "+X"
 
 
 class DesignIssue(BaseModel):
@@ -193,6 +207,7 @@ class LocatingPinCandidate(BaseModel):
 
 class FixtureResult(BaseModel):
     """治具生成结果"""
+    model_config = ConfigDict(extra="ignore")
     fixtureWidth: float
     fixtureHeight: float
     featureSummary: Dict[str, int]
@@ -200,6 +215,9 @@ class FixtureResult(BaseModel):
     reviewItems: List[ReviewItem] = []
     locatingCandidates: List[LocatingPinCandidate] = []
     manualLocatingPins: Optional[List[str]] = None
+    customRegions: List[Dict[str, Any]] = []
+    regionAudit: List[Dict[str, Any]] = []
+    ocrRefDesResults: List[Dict[str, Any]] = []
     status: str = "completed"
     geometrySha256: Optional[str] = None
     productionGate: Optional[ProductionGateResult] = None
