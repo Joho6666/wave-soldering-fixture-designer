@@ -25,9 +25,24 @@ backend/*.db
 
 # Environment and sensitive files
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
 *.log
+
+# Test and coverage output
+.coverage
+coverage/
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # Editor directories
 .vscode/

@@ -2,6 +2,8 @@
 
 基于真实 PCB 制造文件（Gerber / Excellon）的波峰焊过锡载具（Fixture）自动分析、几何生成与 AutoCAD DXF 出图系统。
 
+[![CI](https://github.com/mo9652962-ai/wave-soldering-fixture-designer/actions/workflows/ci.yml/badge.svg)](https://github.com/mo9652962-ai/wave-soldering-fixture-designer/actions/workflows/ci.yml)
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/Python-3.11+-green.svg)
 ![React](https://img.shields.io/badge/React-18-blue.svg)
@@ -77,8 +79,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ## 🧪 运行测试
 
 ```bash
-# 后端自动化测试
-pytest backend/tests
+# 后端自动化测试（pytest 配置位于 backend/）
+cd backend
+pytest -q
+cd ..
 
 # 前端单元与组件测试
 npm test
@@ -87,6 +91,8 @@ npm test
 npm run lint
 npm run build
 ```
+
+仓库不会提交 `.env`、本地证书/密钥、上传目录或测试覆盖率产物；请复制 `.env.example` 为本地配置文件，再按需填写后端服务参数。
 
 ---
 
