@@ -1,50 +1,35 @@
 # Golden Sample Validation Framework
 
-## Purpose
-Compare auto-generated fixture DXF against engineer-drawn reference DXF for the same PCB Gerber, producing quantitative geometry accuracy reports.
+Compare auto-generated fixture DXF against engineer-drawn reference DXF for the same PCB, producing per-feature PASS / WARNING / FAIL reports.
 
-## Directory Structure
+## Directory
+
 ```
 validation/
-  manual_dxf_parser.py      # Parse engineer-drawn DXF into Shapely geometries
-  geometry_comparator.py     # Compute IoU, Hausdorff, center/diameter errors
-  run_all.py                 # CLI: scan cases/, generate, compare, report
   cases/
-    CASE-NNN/
-      source/                # gerber.zip (input)
-      expected/              # manual_fixture.dxf + expected.json + manual_layer_mapping.json
-      generated/             # auto-generated fixture.dxf + preview.svg (output)
-      report/                # comparison.json + comparison.md (output)
+    CASE-001/
+      case.json
+      input/          # gerber.zip (missing today)
+      reference/      # engineer DXF (missing today)
+      generated/      # auto DXF/SVG
+      report/         # validation_report.json / .md / overlay.svg
 ```
+
+`case.json` status: `awaiting_input` | `awaiting_reference_dxf` | `ready` | `passed` | `failed` | `review_required`.
+
+CASE-001 is `awaiting_input`. There is **no** engineer DXF in this repository. Do not mark it passed.
 
 ## Usage
+
 ```bash
 python -m validation.run_all
-# 在仓库根目录运行。validation/ 不在 backend/ 内。
 ```
 
-## Adding a New Case
-1. Create `validation/cases/CASE-NNN/source/` and place `gerber.zip` inside.
-2. Place the engineer-drawn DXF in `expected/manual_fixture.dxf`.
-3. Optionally add `expected/manual_layer_mapping.json` if DXF layer names are non-standard.
-4. Optionally add `expected/expected.json` with dimensional metadata.
-5. Run `python -m validation.run_all` to auto-generate and compare.
+API:
 
-## Layer Mapping
-The parser maps DXF layers to standard fixture layers:
-- `SINK_AREA` / `SINK_REGION` → sink region
-- `KEEPOUT_BOT` / `KEEP_OUT_BOT` → BOT keepout regions
-- `SOLDER_WINDOW_TOP` / `SOLDER_TOP` → TOP solder windows
-- `POSITIONING_PINS` / `LOCATING_PINS` → locating pins (circles)
-- `CLIPS` / `CLAMP_HOLES` → clamp holes (circles)
-- `FIXTURE_OUTLINE` → fixture body outline
-- `RAILS` → rail regions
-- `SOLDER_BARRIERS` → solder barrier regions
+- `GET /api/validation/cases`
+- `GET /api/validation/cases/{id}`
+- `GET /api/validation/cases/{id}/overlay`
+- `POST /api/validation/cases/{id}/run` — 409 if input or reference DXF is missing
 
-Non-standard names can be remapped via `manual_layer_mapping.json`:
-```json
-{
-  "MyCustomSinkLayer": "SINK_AREA",
-  "OuterFrame": "FIXTURE_OUTLINE"
-}
-```
+UI: `/validation`

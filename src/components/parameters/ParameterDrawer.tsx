@@ -15,6 +15,25 @@ export const ParameterDrawer: React.FC = () => {
   } = useProjectStore();
 
   const [formParams, setFormParams] = useState(parameters);
+  const [catalog, setCatalog] = useState<Array<{
+    name: string;
+    default: number | boolean | string;
+    unit: string;
+    description: string;
+    category: string;
+    min: number | null;
+    max: number | null;
+    editable: boolean;
+    type: string;
+    choices?: string[] | null;
+  }>>([]);
+
+  React.useEffect(() => {
+    fetch("/api/process-profile")
+      .then((r) => r.json())
+      .then((data) => setCatalog(data.parameters || []))
+      .catch(() => setCatalog([]));
+  }, []);
 
   // 同步外部变化
   React.useEffect(() => {
@@ -470,6 +489,73 @@ export const ParameterDrawer: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {["Wave", "Pressure Relief", "Panel"].map((category) => {
+          const items = catalog.filter((p) => p.category === category && p.editable);
+          if (items.length === 0) return null;
+          return (
+            <div key={category}>
+              <h3 className="font-label-caps text-label-caps text-primary-container uppercase tracking-wider mb-3">
+                {category}
+              </h3>
+              <div className="space-y-3 font-data-mono text-body-sm">
+                {items.map((item) => {
+                  const raw = formParams[item.name];
+                  if (item.type === "boolean") {
+                    const checked = Boolean(raw ?? item.default);
+                    return (
+                      <label key={item.name} className="flex items-center justify-between gap-2 text-on-surface-variant">
+                        <span title={item.description}>{item.description || item.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => setFormParams({ ...formParams, [item.name]: e.target.checked })}
+                        />
+                      </label>
+                    );
+                  }
+                  if (item.type === "enum" && item.choices) {
+                    return (
+                      <div key={item.name}>
+                        <div className="flex justify-between text-on-surface-variant mb-1">
+                          <span title={item.description}>{item.description || item.name}</span>
+                          <span className="text-on-surface font-bold">{String(raw ?? item.default)}</span>
+                        </div>
+                        <select
+                          value={String(raw ?? item.default)}
+                          onChange={(e) => setFormParams({ ...formParams, [item.name]: e.target.value })}
+                          className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs"
+                        >
+                          {item.choices.map((choice) => (
+                            <option key={choice} value={choice}>{choice}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+                  const numeric = Number(raw ?? item.default ?? 0);
+                  return (
+                    <div key={item.name}>
+                      <div className="flex justify-between text-on-surface-variant mb-1">
+                        <span title={item.description}>{item.description || item.name}</span>
+                        <span className="text-on-surface font-bold">{numeric} {item.unit}</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={item.min ?? undefined}
+                        max={item.max ?? undefined}
+                        value={numeric}
+                        onChange={(e) => setFormParams({ ...formParams, [item.name]: parseFloat(e.target.value) })}
+                        className="w-full bg-surface border border-outline-variant text-on-surface p-2 text-xs focus:border-primary-container focus:outline-none"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Actions */}

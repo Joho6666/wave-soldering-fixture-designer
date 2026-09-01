@@ -93,6 +93,7 @@ class PCBAnalysis(BaseModel):
 
 class FixtureParameters(BaseModel):
     """前后端统一的治具参数 DTO（单位均为 mm）。"""
+    model_config = ConfigDict(extra="allow")
     sinkClearanceMm: float = 0.2
     keepoutClearanceMm: float = 0.7
     solderClearanceMm: float = 3.0
@@ -127,6 +128,23 @@ class FixtureParameters(BaseModel):
     clampPinClearanceMm: float = 10.0
     waveDirection: str = "+X"
     conveyorDirection: str = "+X"
+    directionalOpeningEnabled: bool = False
+    solderLeadingExtensionMm: float = 0.8
+    solderTrailingExtensionMm: float = 1.5
+    solderSideClearanceMm: float = 0.0
+    solderEntryChamferMm: float = 0.0
+    solderExitChamferMm: float = 0.0
+    pressureReliefEnabled: bool = False
+    pressureReliefMinPocketAreaMm2: float = 400.0
+    pressureReliefChannelWidthMm: float = 2.0
+    pressureReliefEdgeClearanceMm: float = 3.0
+    panelEnabled: bool = False
+    panelRows: float = 1.0
+    panelCols: float = 1.0
+    panelBoardSpacingMm: float = 2.0
+    panelOuterMarginMm: float = 5.0
+    panelToolingHoleDiameterMm: float = 3.0
+    panelFiducialDiameterMm: float = 1.0
 
 
 class DesignIssue(BaseModel):
@@ -226,6 +244,8 @@ class FixtureResult(BaseModel):
     softwareVersion: Optional[str] = None
     ruleProfileVersion: Optional[str] = None
     generatedAt: str
+    manifest: Optional[Dict[str, Any]] = None
+    panel: Optional[Dict[str, Any]] = None
 
 
 class JobResponse(BaseModel):

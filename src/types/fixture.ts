@@ -29,6 +29,24 @@ export interface FixtureParameters {
   minPinHoleDiameterMm?: number;
   maxPinHoleDiameterMm?: number;
   minPinSeparationMm?: number;
+  waveDirection?: string;
+  conveyorDirection?: string;
+  directionalOpeningEnabled?: boolean;
+  solderLeadingExtensionMm?: number;
+  solderTrailingExtensionMm?: number;
+  solderSideClearanceMm?: number;
+  solderEntryChamferMm?: number;
+  solderExitChamferMm?: number;
+  pressureReliefEnabled?: boolean;
+  pressureReliefMinPocketAreaMm2?: number;
+  pressureReliefChannelWidthMm?: number;
+  pressureReliefEdgeClearanceMm?: number;
+  panelEnabled?: boolean;
+  panelRows?: number;
+  panelCols?: number;
+  panelBoardSpacingMm?: number;
+  panelOuterMarginMm?: number;
+  [key: string]: string | number | boolean | undefined;
 }
 
 export const DEFAULT_PARAMETERS: FixtureParameters = {

@@ -35,6 +35,7 @@ STANDARD_LAYER_MAP: dict[str, str] = {
     "SPRING_CLIPS": "spring_clips",
     "HANDHOLDS": "handholds",
     "PCB_OUTLINE": "pcb_outline",
+    "PRESSURE_RELIEF": "pressure_relief",
 }
 
 CIRCLE_FEATURE_KEYS = {
@@ -53,6 +54,7 @@ POLYGON_FEATURE_KEYS = {
     "solder_barriers",
     "handholds",
     "pcb_outline",
+    "pressure_relief",
 }
 
 
@@ -77,6 +79,7 @@ class ManualFixtureData:
     solder_barriers: list[Polygon] = field(default_factory=list)
     handholds: list[Polygon] = field(default_factory=list)
     pcb_outline: list[Polygon] = field(default_factory=list)
+    pressure_relief: list[Polygon] = field(default_factory=list)
     locating_pins: list[CircleFeature] = field(default_factory=list)
     clamp_holes: list[CircleFeature] = field(default_factory=list)
     barrier_mount_holes: list[CircleFeature] = field(default_factory=list)
@@ -139,12 +142,29 @@ class ManualFixtureDxfParser:
     @classmethod
     def from_case_dir(cls, case_dir: str | Path) -> ManualFixtureData:
         case_dir = Path(case_dir)
-        expected_dir = case_dir / "expected"
-        dxf_path = expected_dir / "manual_fixture.dxf"
-        mapping_path = expected_dir / "manual_layer_mapping.json"
+        dxf_path = None
+        mapping_path = None
+        for folder_name in ("reference", "expected"):
+            folder = case_dir / folder_name
+            if mapping_path is None:
+                candidate_map = folder / "manual_layer_mapping.json"
+                if candidate_map.exists():
+                    mapping_path = candidate_map
+            if dxf_path is None:
+                for name in ("engineer_fixture.dxf", "manual_fixture.dxf", "reference.dxf"):
+                    candidate = folder / name
+                    if candidate.exists():
+                        dxf_path = candidate
+                        break
+                if dxf_path is None:
+                    dxfs = sorted(folder.glob("*.dxf"))
+                    if dxfs:
+                        dxf_path = dxfs[0]
+        if dxf_path is None:
+            raise FileNotFoundError(f"No engineer DXF in {case_dir}/reference or expected")
 
         layer_mapping = None
-        if mapping_path.exists():
+        if mapping_path is not None and mapping_path.exists():
             with open(mapping_path, "r", encoding="utf-8") as f:
                 layer_mapping = json.load(f)
 

@@ -1,0 +1,17 @@
+{
+  "caseId": "CASE-001",
+  "description": "Standard demo board placeholder. Waiting for a real PCB ZIP and an engineer-drawn reference DXF.",
+  "pcbInput": null,
+  "referenceDxf": null,
+  "fixtureParameters": {},
+  "processProfile": {},
+  "expectedFeatures": {
+    "keepoutCount": null,
+    "solderOpeningCount": null,
+    "pinCount": 2
+  },
+  "status": "awaiting_input",
+  "engineer": null,
+  "createdAt": "2026-08-31T00:00:00+00:00",
+  "notes": "Do not mark passed. No customer Gerber and no manual reference DXF exist."
+}
