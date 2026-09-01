@@ -1,9 +1,10 @@
 """Pressure relief channels from large pockets to the nearest free fixture edge."""
 from __future__ import annotations
 
+import math
 from typing import Any
 
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points, unary_union
 
@@ -52,14 +53,26 @@ def generate_pressure_relief(
         if pocket is None or pocket.is_empty or pocket.area < min_area:
             continue
         try:
-            _p_on_pocket, p_on_edge = nearest_points(pocket, free_boundary)
+            p_on_pocket, p_on_edge = nearest_points(pocket.boundary, free_boundary)
         except Exception:
             continue
-        start = pocket.centroid
+        start = Point(p_on_pocket.x, p_on_pocket.y)
         end = Point(p_on_edge.x, p_on_edge.y)
         if start.distance(end) < 0.5:
             continue
-        corridor = LineString([(start.x, start.y), (end.x, end.y)]).buffer(half, cap_style="flat")
+        inward = pocket.centroid
+        dx = start.x - inward.x
+        dy = start.y - inward.y
+        length = math.hypot(dx, dy)
+        if length > 1e-6:
+            stub_len = min(half * 2.0, length * 0.25)
+            stub_start = Point(start.x - dx / length * stub_len, start.y - dy / length * stub_len)
+            if not pocket.contains(stub_start) and not pocket.covers(stub_start):
+                stub_start = start
+        else:
+            stub_start = start
+        spine = LineString([(stub_start.x, stub_start.y), (start.x, start.y), (end.x, end.y)])
+        corridor = spine.buffer(half, cap_style="flat")
         corridor = corridor.intersection(body)
         if corridor.is_empty:
             continue
@@ -71,11 +84,10 @@ def generate_pressure_relief(
         if corridor.is_empty:
             continue
         geoms = list(corridor.geoms) if corridor.geom_type == "MultiPolygon" else [corridor]
-        for g_i, geom in enumerate(geoms):
-            if geom.is_empty or geom.area < 0.5:
-                continue
-            if geom.geom_type != "Polygon":
-                continue
+        attached = [g for g in geoms if g.geom_type == "Polygon" and not g.is_empty and g.area >= 0.5 and g.intersects(pocket)]
+        if not attached:
+            continue
+        for g_i, geom in enumerate(attached):
             channels.append(geom)
             source = keepout_meta[idx].id if idx < len(keepout_meta) else f"pocket-{idx+1}"
             metas.append(

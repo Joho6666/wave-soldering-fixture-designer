@@ -12,6 +12,11 @@ from app.geometry.spatial import query_intersects
 from app.models.geometry import FixtureGeometry
 
 
+def _hole_disk(hole: dict[str, Any], default_diameter: float = 3.0) -> BaseGeometry:
+    radius = float(hole.get("diameter", default_diameter)) / 2.0
+    return Point(hole["x"], hole["y"]).buffer(max(radius, 1e-6))
+
+
 def run_drc(fixture: FixtureGeometry) -> list[dict]:
     issues: list[dict] = []
     pcb = fixture.pcb
@@ -69,7 +74,8 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
 
     for hole in fixture.solder_barrier_mount_holes:
         p = Point(hole["x"], hole["y"])
-        if fixture.sink_region.contains(p):
+        disk = _hole_disk(hole, 3.2)
+        if fixture.sink_region.intersects(disk):
             issues.append(
                 _issue(
                     "BARRIER_HOLE_COLLISION",
@@ -112,7 +118,8 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
     for clamp in fixture.clamp_holes:
         cp = Point(clamp["x"], clamp["y"])
         c_id = clamp.get("id", "clamp")
-        if not fixture.body.contains(cp):
+        disk = _hole_disk(clamp, 3.4)
+        if not fixture.body.contains(disk):
             issues.append(
                 _issue(
                     "CLAMP_FIXTURE_COLLISION",
@@ -124,7 +131,7 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                     source_ids=[c_id],
                 )
             )
-        if fixture.sink_region.contains(cp):
+        if fixture.sink_region.intersects(disk):
             issues.append(
                 _issue(
                     "CLAMP_SINK_COLLISION",
@@ -137,7 +144,7 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                 )
             )
         for h_idx, handhold in enumerate(fixture.handholds):
-            if handhold.contains(cp):
+            if handhold.intersects(disk):
                 issues.append(
                     _issue(
                         "CLAMP_HANDHOLD_COLLISION",
@@ -150,7 +157,7 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                     )
                 )
         for r_idx, rail in enumerate(fixture.rails):
-            if rail.contains(cp):
+            if rail.intersects(disk):
                 issues.append(
                     _issue(
                         "CLAMP_RAIL_COLLISION",
@@ -185,8 +192,9 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
     for pin in fixture.locating_pins:
         pp = Point(pin["x"], pin["y"])
         p_id = pin.get("id", "pin")
+        pin_disk = _hole_disk(pin, 3.0)
         for k_idx, keepout in enumerate(fixture.keepout_regions):
-            if keepout.contains(pp):
+            if keepout.intersects(pin_disk):
                 issues.append(
                     _issue(
                         "LOCATING_PIN_KEEP_OUT_COLLISION",
@@ -199,7 +207,7 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
                     )
                 )
         for s_idx, solder in enumerate(fixture.solder_regions):
-            if solder.contains(pp):
+            if solder.intersects(pin_disk):
                 issues.append(
                     _issue(
                         "LOCATING_PIN_SOLDER_COLLISION",
@@ -217,8 +225,8 @@ def run_drc(fixture: FixtureGeometry) -> list[dict]:
     for clip in fixture.spring_clip_holes:
         cp = Point(clip["x"], clip["y"])
         clip_id = clip.get("id", "clip")
-        clip_circle = cp.buffer(clip["diameter"] / 2)
-        if fixture.sink_region.contains(cp):
+        clip_circle = _hole_disk(clip, 4.9)
+        if fixture.sink_region.intersects(clip_circle):
             issues.append(
                 _issue(
                     "SPRING_CLIP_SINK_COLLISION",
@@ -552,8 +560,9 @@ def _panel_drc(fixture: FixtureGeometry, min_web: float) -> list[dict]:
                 )
     for hole in list(getattr(fixture, "tooling_holes", []) or []):
         p = Point(hole["x"], hole["y"])
+        disk = _hole_disk(hole, 3.0)
         hid = str(hole.get("id", "tooling"))
-        if not fixture.body.contains(p):
+        if not fixture.body.contains(disk):
             issues.append(
                 _issue(
                     "TOOLING_HOLE_COLLISION",
@@ -566,7 +575,8 @@ def _panel_drc(fixture: FixtureGeometry, min_web: float) -> list[dict]:
                 )
             )
         for id_a, g_a in outlines:
-            if g_a.contains(p) or g_a.distance(p) < min_web:
+            clearance = g_a.distance(disk) if not g_a.intersects(disk) else 0.0
+            if g_a.intersects(disk) or clearance < min_web:
                 issues.append(
                     _issue(
                         "TOOLING_HOLE_COLLISION",
@@ -579,7 +589,8 @@ def _panel_drc(fixture: FixtureGeometry, min_web: float) -> list[dict]:
                     )
                 )
         for pin in fixture.locating_pins or []:
-            if math.hypot(hole["x"] - pin["x"], hole["y"] - pin["y"]) < min_web + float(hole.get("diameter", 3.0)) / 2:
+            pin_disk = _hole_disk(pin, 3.0)
+            if disk.distance(pin_disk) < min_web or disk.intersects(pin_disk):
                 issues.append(
                     _issue(
                         "TOOLING_HOLE_COLLISION",

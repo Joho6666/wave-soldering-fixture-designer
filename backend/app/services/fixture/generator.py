@@ -293,7 +293,8 @@ class FixtureGenerator:
 
         combined_outline = unary_union(outlines)
         combined_sink = unary_union(sink_parts)
-        body = fixture_body(combined_sink, params)
+        envelope = unary_union([combined_sink, panel.outline])
+        body = fixture_body(envelope, params)
         handhold_regions = handholds(combined_sink, params)
         rails, barriers, barrier_mount_holes = rails_and_barriers(body, params)
 

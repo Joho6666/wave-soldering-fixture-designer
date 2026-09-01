@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from shapely.geometry import Polygon
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
 from validation.geometry_comparator import GeometryComparator, PolygonComparisonResult
@@ -83,17 +84,28 @@ def _pct(expected: float, generated: float) -> float:
     return abs(generated - expected) / abs(expected) * 100.0
 
 
-def _union(polys: list[Polygon] | None) -> Polygon | None:
+def _union(polys: list[Polygon] | None) -> BaseGeometry | None:
+    """Keep every island. Do not drop smaller polygons from a MultiPolygon."""
     items = [p for p in (polys or []) if p is not None and not p.is_empty]
     if not items:
         return None
     merged = unary_union(items)
-    if merged.geom_type == "MultiPolygon":
-        return max(merged.geoms, key=lambda g: g.area)
+    if merged.is_empty:
+        return None
     return merged
 
 
-def _score_polygon(name: str, expected: Polygon | None, generated: Polygon | None) -> FeatureScore:
+def _as_polygon_like(value: Any) -> BaseGeometry | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return _union(value)
+    if getattr(value, "is_empty", False):
+        return None
+    return value
+
+
+def _score_polygon(name: str, expected: BaseGeometry | None, generated: BaseGeometry | None) -> FeatureScore:
     if expected is None and generated is None:
         return FeatureScore(name=name, status="PASS", notes=["both empty"])
     if expected is None or generated is None:
@@ -202,8 +214,8 @@ def _as_polys(value: Any) -> list[Polygon]:
 
 def compare_fixture(manual: ManualFixtureData, generated: dict[str, Any], case_id: str) -> ValidationVerdict:
     features = [
-        _score_polygon("fixture_outline", _union(manual.fixture_outline), generated.get("fixture_outline")),
-        _score_polygon("sink_region", _union(manual.sink_region), generated.get("sink_area")),
+        _score_polygon("fixture_outline", _union(manual.fixture_outline), _as_polygon_like(generated.get("fixture_outline"))),
+        _score_polygon("sink_region", _union(manual.sink_region), _as_polygon_like(generated.get("sink_area"))),
         _score_multi("keepout_regions", list(manual.keepout_regions), _as_polys(generated.get("keepout_zones"))),
         _score_multi("solder_windows", list(manual.solder_regions), _as_polys(generated.get("solder_windows"))),
         _score_holes("locating_pins", list(manual.locating_pins), list(generated.get("pins") or [])),
