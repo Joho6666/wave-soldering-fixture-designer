@@ -1,13 +1,13 @@
 """Deterministic fixture geometry generator — orchestration only."""
 from __future__ import annotations
 
-import hashlib
 from typing import Any
 
-from shapely import make_valid, normalize, to_wkb
 from shapely.geometry import Polygon, box
+from shapely.ops import unary_union
 
-from app.models.geometry import FixtureGeometry, PCBGeometry
+from app.geometry.digest import geometry_digest
+from app.models.geometry import FixtureGeometry, FixtureRegion, PCBGeometry
 from app.services.fixture.drc import run_drc
 from app.services.fixture.fixture_body_generator import (
     fixture_body,
@@ -18,13 +18,32 @@ from app.services.fixture.fixture_body_generator import (
 from app.services.fixture.keepout_generator import generate_keepouts
 from app.services.fixture.locating_pin_optimizer import generate_locating_pins
 from app.services.fixture.mounting_generator import clamp_holes, front_panel_spring_clips
+from app.services.fixture.pressure_relief import generate_pressure_relief
 from app.services.fixture.semantic_adapter import ensure_semantic
 from app.services.fixture.solder_optimizer import generate_solder_openings
+from app.services.panel.grid import build_grid_panel
 from app.services.rules.process_profile import ProcessProfile
 
 
 class FixtureGenerationError(ValueError):
     pass
+
+
+def _copy_hole(hole: dict[str, Any], transform) -> dict[str, Any]:
+    return transform.apply_hole(hole)
+
+
+def _copy_region_meta(meta: FixtureRegion, geom, suffix: str) -> FixtureRegion:
+    return FixtureRegion(
+        id=f"{meta.id}-{suffix}",
+        region_type=meta.region_type,
+        geometry=geom,
+        source_type=meta.source_type,
+        source_ids=tuple(f"{s}:{suffix}" for s in meta.source_ids) if meta.source_ids else (suffix,),
+        confidence=meta.confidence,
+        manual_override=meta.manual_override,
+        parameters=dict(meta.parameters or {}),
+    )
 
 
 class FixtureGenerator:
@@ -43,7 +62,23 @@ class FixtureGenerator:
         params = self._parameters(parameters)
         ensure_semantic(self.pcb)
 
-        sink_region = generate_sink_region_with_relief(self.pcb.outline, params)
+        panel = build_grid_panel(self.pcb, params)
+        if panel is not None:
+            return self._generate_panel(params, panel, review_actions, manual_pins, custom_regions)
+        return self._generate_single(params, review_actions, manual_pins, custom_regions, working_pcb=self.pcb)
+
+    def _generate_single(
+        self,
+        params: dict[str, Any],
+        review_actions: dict[str, str] | None,
+        manual_pins: list[str] | None,
+        custom_regions: list[dict[str, Any]] | None,
+        working_pcb: PCBGeometry,
+        panel=None,
+        tooling_holes: list[dict[str, Any]] | None = None,
+        fiducials: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        sink_region = generate_sink_region_with_relief(working_pcb.outline, params)
         if sink_region.is_empty or not sink_region.is_valid:
             raise FixtureGenerationError("PCB 外形偏移后无法形成有效沉板区。")
 
@@ -53,17 +88,15 @@ class FixtureGenerator:
         rails, barriers, barrier_mount_holes = rails_and_barriers(body, params)
 
         locating_candidates, locating_pins, locating_review = generate_locating_pins(
-            self.pcb, params, manual_pins, review_actions
+            working_pcb, params, manual_pins, review_actions
         )
-        keepouts, keepout_review, keepout_meta = generate_keepouts(self.pcb, params, review_actions)
-        solder_regions, solder_review, solder_meta = generate_solder_openings(self.pcb, params, review_actions)
-        spring_clips, spring_clip_review = front_panel_spring_clips(self.pcb, params, review_actions)
+        keepouts, keepout_review, keepout_meta = generate_keepouts(working_pcb, params, review_actions)
+        solder_regions, solder_review, solder_meta = generate_solder_openings(working_pcb, params, review_actions)
+        spring_clips, spring_clip_review = front_panel_spring_clips(working_pcb, params, review_actions)
 
-        # Re-score pins against generated keepout/solder/clamp only when auto-selecting.
-        # Manual pin choices are never silently replaced.
         if not manual_pins:
             locating_candidates, locating_pins, locating_review = generate_locating_pins(
-                self.pcb,
+                working_pcb,
                 params,
                 manual_pins,
                 review_actions,
@@ -73,7 +106,6 @@ class FixtureGenerator:
             )
 
         if custom_regions:
-            from app.models.geometry import FixtureRegion
             for idx, cr in enumerate(custom_regions):
                 cx = float(cr.get("x", 0.0))
                 cy = float(cr.get("y", 0.0))
@@ -101,13 +133,24 @@ class FixtureGenerator:
                     solder_regions.append(poly)
                     solder_meta.append(meta)
 
+        relief_channels, relief_meta = generate_pressure_relief(
+            body=body,
+            pcb_outline=working_pcb.outline,
+            keepouts=keepouts,
+            keepout_meta=keepout_meta,
+            solder_regions=solder_regions,
+            locating_pins=locating_pins,
+            clamp_holes=clamp,
+            params=params,
+        )
+
         review_items = [*locating_review, *keepout_review, *solder_review, *spring_clip_review]
         pending_mandatory_reviews = [
             r for r in review_items if r.get("mandatory", True) and r.get("status") == "pending"
         ]
 
         provisional = FixtureGeometry(
-            pcb=self.pcb,
+            pcb=working_pcb,
             body=body,
             sink_region=sink_region,
             keepout_regions=keepouts,
@@ -119,23 +162,32 @@ class FixtureGenerator:
             rails=rails,
             solder_barriers=barriers,
             solder_barrier_mount_holes=barrier_mount_holes,
-            spring_clip_holes=spring_clips,
             drc_issues=[],
             review_items=review_items,
             parameters=params,
             geometry_sha256="",
+            spring_clip_holes=spring_clips,
             keepout_region_meta=keepout_meta,
             solder_region_meta=solder_meta,
+            pressure_relief_channels=relief_channels,
+            pressure_relief_meta=relief_meta,
+            tooling_holes=tooling_holes or [],
+            fiducials=fiducials or [],
+            panel=panel,
         )
         provisional.drc_issues = run_drc(provisional)
         provisional.geometry_sha256 = self._geometry_digest(provisional)
 
         status = "review_required" if len(pending_mandatory_reviews) > 0 else "completed"
-        region_audit = [m.to_dict() for m in keepout_meta] + [m.to_dict() for m in solder_meta]
+        region_audit = (
+            [m.to_dict() for m in keepout_meta]
+            + [m.to_dict() for m in solder_meta]
+            + [m.to_dict() for m in relief_meta]
+        )
 
         return {
             "fixture_geometry": provisional,
-            "pcb_outline": self.pcb.outline,
+            "pcb_outline": working_pcb.outline,
             "fixture_outline": body,
             "sink_area": sink_region,
             "keepout_zones": keepouts,
@@ -148,6 +200,10 @@ class FixtureGenerator:
             "solder_barriers": barriers,
             "solder_barrier_mount_holes": barrier_mount_holes,
             "spring_clips": spring_clips,
+            "pressure_relief_channels": relief_channels,
+            "tooling_holes": tooling_holes or [],
+            "fiducials": fiducials or [],
+            "panel": panel.to_dict() if panel is not None else None,
             "issues": provisional.drc_issues,
             "reviewItems": review_items,
             "status": status,
@@ -164,6 +220,181 @@ class FixtureGenerator:
                 "clampCount": len(clamp),
                 "barrierMountHoleCount": len(barrier_mount_holes),
                 "springClipCount": len(spring_clips),
+                "pressureReliefCount": len(relief_channels),
+                "panelInstanceCount": len(panel.pcb_instances) if panel is not None else 1,
+                "semanticComponentCount": len(working_pcb.components or []),
+                "throughHoleComponentCount": len(working_pcb.through_hole_components or []),
+            },
+        }
+
+    def _generate_panel(
+        self,
+        params: dict[str, Any],
+        panel,
+        review_actions: dict[str, str] | None,
+        manual_pins: list[str] | None,
+        custom_regions: list[dict[str, Any]] | None,
+    ) -> dict[str, Any]:
+        """Generate per-instance features, then one shared fixture body around the panel."""
+        local = self._generate_single(
+            params,
+            review_actions,
+            manual_pins,
+            custom_regions,
+            working_pcb=self.pcb,
+            panel=None,
+        )
+        local_fix: FixtureGeometry = local["fixture_geometry"]
+
+        keepouts: list = []
+        keepout_meta: list[FixtureRegion] = []
+        solders: list = []
+        solder_meta: list[FixtureRegion] = []
+        pins: list[dict[str, Any]] = []
+        pin_candidates: list[dict[str, Any]] = []
+        clamps: list[dict[str, Any]] = []
+        springs: list[dict[str, Any]] = []
+        outlines = []
+        sink_parts = []
+
+        for inst in panel.pcb_instances:
+            tf = inst.transform
+            outlines.append(tf.apply(self.pcb.outline))
+            sink_parts.append(tf.apply(local_fix.sink_region))
+            for g, meta in zip(local_fix.keepout_regions, local_fix.keepout_region_meta or [None] * len(local_fix.keepout_regions)):
+                gg = tf.apply(g)
+                keepouts.append(gg)
+                if meta is not None:
+                    keepout_meta.append(_copy_region_meta(meta, gg, inst.id))
+            for g, meta in zip(local_fix.solder_regions, local_fix.solder_region_meta or [None] * len(local_fix.solder_regions)):
+                gg = tf.apply(g)
+                solders.append(gg)
+                if meta is not None:
+                    solder_meta.append(_copy_region_meta(meta, gg, inst.id))
+            for pin in local_fix.locating_pins:
+                copied = _copy_hole(pin, tf)
+                copied["id"] = f"{pin.get('id', 'pin')}-{inst.id}"
+                pins.append(copied)
+            for cand in local_fix.locating_pin_candidates:
+                copied = dict(cand)
+                x, y = tf.apply_xy(float(cand["x"]), float(cand["y"]))
+                copied["x"] = x
+                copied["y"] = y
+                copied["id"] = f"{cand.get('id', 'cand')}-{inst.id}"
+                pin_candidates.append(copied)
+            for clamp in local_fix.clamp_holes:
+                copied = _copy_hole(clamp, tf)
+                copied["id"] = f"{clamp.get('id', 'clamp')}-{inst.id}"
+                clamps.append(copied)
+            for sp in local_fix.spring_clip_holes:
+                copied = _copy_hole(sp, tf)
+                copied["id"] = f"{sp.get('id', 'spring')}-{inst.id}"
+                springs.append(copied)
+
+        combined_outline = unary_union(outlines)
+        combined_sink = unary_union(sink_parts)
+        body = fixture_body(combined_sink, params)
+        handhold_regions = handholds(combined_sink, params)
+        rails, barriers, barrier_mount_holes = rails_and_barriers(body, params)
+
+        working = PCBGeometry(
+            outline=combined_outline,
+            holes=list(self.pcb.holes),
+            layers=list(self.pcb.layers),
+            source_sha256=self.pcb.source_sha256,
+            geometry_sha256=self.pcb.geometry_sha256,
+            components=list(self.pcb.components or []),
+            pads=list(self.pcb.pads or []),
+            through_hole_components=list(self.pcb.through_hole_components or []),
+            semantic_conflicts=list(self.pcb.semantic_conflicts or []),
+        )
+
+        relief_channels, relief_meta = generate_pressure_relief(
+            body=body,
+            pcb_outline=combined_outline,
+            keepouts=keepouts,
+            keepout_meta=keepout_meta,
+            solder_regions=solders,
+            locating_pins=pins,
+            clamp_holes=clamps,
+            params=params,
+        )
+
+        review_items = list(local_fix.review_items)
+        pending_mandatory_reviews = [
+            r for r in review_items if r.get("mandatory", True) and r.get("status") == "pending"
+        ]
+        provisional = FixtureGeometry(
+            pcb=working,
+            body=body,
+            sink_region=combined_sink,
+            keepout_regions=keepouts,
+            solder_regions=solders,
+            locating_pins=pins,
+            locating_pin_candidates=pin_candidates,
+            clamp_holes=clamps,
+            handholds=handhold_regions,
+            rails=rails,
+            solder_barriers=barriers,
+            solder_barrier_mount_holes=barrier_mount_holes,
+            drc_issues=[],
+            review_items=review_items,
+            parameters=params,
+            geometry_sha256="",
+            spring_clip_holes=springs,
+            keepout_region_meta=keepout_meta,
+            solder_region_meta=solder_meta,
+            pressure_relief_channels=relief_channels,
+            pressure_relief_meta=relief_meta,
+            tooling_holes=list(panel.tooling_holes),
+            fiducials=list(panel.fiducials),
+            panel=panel,
+        )
+        provisional.drc_issues = run_drc(provisional)
+        provisional.geometry_sha256 = self._geometry_digest(provisional)
+        status = "review_required" if len(pending_mandatory_reviews) > 0 else "completed"
+        region_audit = (
+            [m.to_dict() for m in keepout_meta]
+            + [m.to_dict() for m in solder_meta]
+            + [m.to_dict() for m in relief_meta]
+        )
+        return {
+            "fixture_geometry": provisional,
+            "pcb_outline": combined_outline,
+            "fixture_outline": body,
+            "sink_area": combined_sink,
+            "keepout_zones": keepouts,
+            "solder_windows": solders,
+            "pins": pins,
+            "locating_candidates": pin_candidates,
+            "clips": clamps,
+            "handholds": handhold_regions,
+            "rails": rails,
+            "solder_barriers": barriers,
+            "solder_barrier_mount_holes": barrier_mount_holes,
+            "spring_clips": springs,
+            "pressure_relief_channels": relief_channels,
+            "tooling_holes": list(panel.tooling_holes),
+            "fiducials": list(panel.fiducials),
+            "panel": panel.to_dict(),
+            "issues": provisional.drc_issues,
+            "reviewItems": review_items,
+            "status": status,
+            "fixtureWidth": provisional.width,
+            "fixtureHeight": provisional.height,
+            "geometrySha256": provisional.geometry_sha256,
+            "regionAudit": region_audit,
+            "featureSummary": {
+                "sinkRegionCount": 1,
+                "keepoutRegionCount": len(keepouts),
+                "solderWindowCount": len(solders),
+                "locatingPinCount": len(pins),
+                "locatingCandidateCount": len(pin_candidates),
+                "clampCount": len(clamps),
+                "barrierMountHoleCount": len(barrier_mount_holes),
+                "springClipCount": len(springs),
+                "pressureReliefCount": len(relief_channels),
+                "panelInstanceCount": len(panel.pcb_instances),
                 "semanticComponentCount": len(self.pcb.components or []),
                 "throughHoleComponentCount": len(self.pcb.through_hole_components or []),
             },
@@ -172,7 +403,6 @@ class FixtureGenerator:
     def _parameters(self, supplied: dict[str, Any]) -> dict[str, Any]:
         return ProcessProfile.from_dict(supplied).to_dict()
 
-    # Thin wrappers kept for existing unit tests that call private methods.
     def _generate_sink_region_with_relief(self, outline: Polygon, params: dict[str, Any]) -> Polygon:
         return generate_sink_region_with_relief(outline, params)
 
@@ -212,28 +442,4 @@ class FixtureGenerator:
         return front_panel_spring_clips(self.pcb, merged, review_actions)
 
     def _geometry_digest(self, fixture: FixtureGeometry) -> str:
-        h = hashlib.sha256()
-        h.update(to_wkb(normalize(make_valid(fixture.body)), hex=False))
-        h.update(to_wkb(normalize(make_valid(fixture.sink_region)), hex=False))
-        sorted_pins = sorted(fixture.locating_pins, key=lambda p: (p["x"], p["y"]))
-        for pin in sorted_pins:
-            h.update(f"{pin['x']}:{pin['y']}:{pin['diameter']}".encode("utf-8"))
-        sorted_clamps = sorted(fixture.clamp_holes, key=lambda c: (c["x"], c["y"]))
-        for clip in sorted_clamps:
-            h.update(f"{clip['x']}:{clip['y']}:{clip['diameter']}".encode("utf-8"))
-        sorted_springs = sorted(getattr(fixture, "spring_clip_holes", []), key=lambda s: (s["x"], s["y"]))
-        for sp in sorted_springs:
-            h.update(f"{sp['x']}:{sp['y']}:{sp['diameter']}".encode("utf-8"))
-        sorted_keepouts = sorted(
-            [kz for kz in fixture.keepout_regions if not kz.is_empty],
-            key=lambda k: (k.centroid.x, k.centroid.y),
-        )
-        for kz in sorted_keepouts:
-            h.update(to_wkb(normalize(make_valid(kz)), hex=False))
-        sorted_solders = sorted(
-            [sw for sw in fixture.solder_regions if not sw.is_empty],
-            key=lambda s: (s.centroid.x, s.centroid.y),
-        )
-        for sw in sorted_solders:
-            h.update(to_wkb(normalize(make_valid(sw)), hex=False))
-        return h.hexdigest()
+        return geometry_digest(fixture)

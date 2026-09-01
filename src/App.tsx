@@ -4,6 +4,7 @@ import { UploadPage } from "./pages/UploadPage";
 import { ProcessingPage } from "./pages/ProcessingPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { ErrorPage } from "./pages/ErrorPage";
+import { ValidationPage } from "./pages/ValidationPage";
 import { Toast } from "./components/common/Toast";
 import { DevToolbar } from "./components/layout/DevToolbar";
 import { LayerConfirmModal } from "./components/gerber/LayerConfirmModal";
@@ -11,6 +12,10 @@ import { AiSettingsModal } from "./components/settings/AiSettingsModal";
 
 export const App: React.FC = () => {
   const { jobStatus } = useProjectStore();
+  const path = typeof window !== "undefined" ? window.location.pathname : "/";
+  if (path.startsWith("/validation")) {
+    return <ValidationPage />;
+  }
 
   const renderActivePage = () => {
     switch (jobStatus) {

@@ -54,6 +54,12 @@ export const TopNavBar: React.FC = () => {
 
       {/* Nav Actions */}
       <div className="flex items-center gap-2">
+        <a
+          href="/validation"
+          className="px-3 py-1.5 border border-outline-variant text-body-sm text-on-surface hover:bg-surface-container-high"
+        >
+          Golden 验证
+        </a>
         {(jobStatus === "completed" || jobStatus === "review_required") && (
           <>
             {/* 工程参数按钮 */}

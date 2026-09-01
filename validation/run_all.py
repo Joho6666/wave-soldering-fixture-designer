@@ -11,6 +11,8 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(BACKEND_DIR))
 
+from validation.case_catalog import load_case_json
+from validation.golden_validator import compare_fixture, overlay_svg, write_reports
 from validation.manual_dxf_parser import ManualFixtureDxfParser
 from validation.geometry_comparator import GeometryComparator
 
@@ -93,11 +95,15 @@ def run_case(case_dir: Path) -> dict | None:
     print(f"  [{case_id}] Comparing geometries...")
     comparator = GeometryComparator()
     report = comparator.full_compare(manual_data, fixture_data, case_id=case_id)
-
     GeometryComparator.save_report(report, report_dir)
-    print(f"  [{case_id}] ✓ Report saved to {report_dir}")
+    verdict = compare_fixture(manual_data, fixture_data, case_id)
+    write_reports(verdict, report_dir)
+    (report_dir / "overlay.svg").write_text(overlay_svg(manual_data, fixture_data), encoding="utf-8")
+    print(f"  [{case_id}] ✓ Report saved to {report_dir} overall={verdict.overall}")
 
-    return report.to_dict()
+    payload = report.to_dict()
+    payload["golden"] = verdict.to_dict()
+    return payload
 
 
 def main():

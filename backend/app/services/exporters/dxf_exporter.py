@@ -29,6 +29,9 @@ def export_fixture_dxf(layers_data: Dict[str, Any], output_path: str) -> str:
     doc.layers.new('BARRIER_MOUNT_HOLES', dxfattribs={'color': 30})
     doc.layers.new('PCB_DRILL', dxfattribs={'color': 9})         # 浅灰
     doc.layers.new('SPRING_CLIPS', dxfattribs={'color': 41})     # 浅蓝
+    doc.layers.new('PRESSURE_RELIEF', dxfattribs={'color': 40})  # 泄压槽
+    doc.layers.new('TOOLING_HOLES', dxfattribs={'color': 8})
+    doc.layers.new('FIDUCIALS', dxfattribs={'color': 5})
     doc.layers.new('DIMENSIONS', dxfattribs={'color': 7})        # 白色
     
     # 1. 绘制 PCB 外形
@@ -100,6 +103,21 @@ def export_fixture_dxf(layers_data: Dict[str, Any], output_path: str) -> str:
             center=(clip['x'], clip['y']),
             radius=clip.get('diameter', 4.9) / 2,
             dxfattribs={'layer': 'SPRING_CLIPS'}
+        )
+
+    for channel in layers_data.get('pressure_relief_channels', []):
+        _draw_polygon(msp, channel, 'PRESSURE_RELIEF')
+    for hole in layers_data.get('tooling_holes', []):
+        msp.add_circle(
+            center=(hole['x'], hole['y']),
+            radius=float(hole.get('diameter', 3.0)) / 2,
+            dxfattribs={'layer': 'TOOLING_HOLES'},
+        )
+    for fid in layers_data.get('fiducials', []):
+        msp.add_circle(
+            center=(fid['x'], fid['y']),
+            radius=float(fid.get('diameter', 1.0)) / 2,
+            dxfattribs={'layer': 'FIDUCIALS'},
         )
 
     # 11. 尺寸标注
@@ -364,6 +382,7 @@ def export_fixture_svg(layers_data: Dict[str, Any], output_path: str) -> str:
         ('handholds', '#ab47bc', layers_data.get('handholds', [])),
         ('rails', '#78909c', layers_data.get('rails', [])),
         ('solder-barriers', '#ff6e40', layers_data.get('solder_barriers', [])),
+        ('pressure-relief', '#ffca28', layers_data.get('pressure_relief_channels', [])),
     ]:
         svg_parts.append(f'<g id="{group_id}">')
         for index, geometry in enumerate(geometries):

@@ -243,6 +243,11 @@ class FixtureGeometry:
     spring_clip_holes: list[dict[str, Any]] = field(default_factory=list)
     keepout_region_meta: list[FixtureRegion] = field(default_factory=list)
     solder_region_meta: list[FixtureRegion] = field(default_factory=list)
+    pressure_relief_channels: list[BaseGeometry] = field(default_factory=list)
+    pressure_relief_meta: list[FixtureRegion] = field(default_factory=list)
+    tooling_holes: list[dict[str, Any]] = field(default_factory=list)
+    fiducials: list[dict[str, Any]] = field(default_factory=list)
+    panel: Any = None
 
     @property
     def bounds(self) -> tuple[float, float, float, float]:

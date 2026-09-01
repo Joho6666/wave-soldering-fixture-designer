@@ -3,6 +3,7 @@
 """
 from __future__ import annotations
 
+import json
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +15,7 @@ from app.models.job import Job
 from app.models.schemas import ErrorCode
 from app.services.exporters.dxf_exporter import export_fixture_dxf, export_fixture_svg
 from app.services.fixture.generator import FixtureGenerator, FixtureGenerationError
+from app.services.fixture.manifest import build_fixture_manifest
 from app.core.config import SOFTWARE_VERSION, ALGORITHM_VERSION, RULE_PROFILE_VERSION
 from app.services.gerber.parser import GerberParser, GerberParseError
 from app.services.gerber.semantic_builder import build_semantic_model
@@ -162,6 +164,21 @@ def process_gerber_job(
                 add_log(job, "warning", f"OCR 提取异常 (已跳过): {ocr_err}")
 
         existing_overrides = (job.result_data or {}).get("drcOverrides", [])
+        manifest = build_fixture_manifest(
+            job_id=job.id,
+            fixture_data=fixture_data,
+            parameters=job.parameters or {},
+            input_path=job.file_path,
+            dxf_path=dxf_path,
+            reviews=fixture_data.get("reviewItems", []),
+            overrides=existing_overrides,
+            layer_mapping_confirmed=bool(job.confirmed_layers),
+        )
+        manifest_path = output_dir / f"{job.id}_fixture_manifest.json"
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
         job.result_data = {
             "ocrRefDesResults": ocr_refdes,
             "fixtureWidth": fixture_data["fixtureWidth"],
@@ -180,6 +197,8 @@ def process_gerber_job(
             "ruleProfileVersion": RULE_PROFILE_VERSION,
             "generatedAt": datetime.now().isoformat(),
             "regionAudit": fixture_data.get("regionAudit", []),
+            "manifest": manifest,
+            "panel": fixture_data.get("panel"),
         }
         
         add_log(job, "info", f"治具工程出图完成，最终状态: {job.status}")

@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from shapely.affinity import translate
 from shapely.geometry import MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
 
@@ -72,6 +73,7 @@ def _from_tht(
         used.update(h.id for h in holes)
         window = _opening_for_cluster(holes, cluster, params)
         window = _refine_with_mask(window, pcb, params)
+        window = apply_directional_opening(window, params)
         confidence = cluster.confidence if cluster.component_type != "unknown" else min(cluster.confidence, 0.78)
         if len(holes) == 1:
             confidence = min(confidence, 0.70)
@@ -258,6 +260,7 @@ def _greedy_fallback(
                         merged_window = combined
             except Exception:
                 pass
+        merged_window = apply_directional_opening(merged_window, params)
 
         rev_id = f"review-top-solder-{start_index + i}"
         confidence = 0.88 if len(cluster) >= 2 else 0.70
@@ -305,3 +308,105 @@ def _status(review_actions: dict[str, str] | None, rev_id: str, confidence: floa
     if review_actions:
         return review_actions.get(rev_id, default)
     return default
+
+
+def wave_leading_trailing(direction: str) -> tuple[str, str]:
+    """Leading is the edge that meets the wave first; trailing is the exit edge."""
+    mapping = {
+        "+X": ("-X", "+X"),
+        "-X": ("+X", "-X"),
+        "+Y": ("-Y", "+Y"),
+        "-Y": ("+Y", "-Y"),
+    }
+    return mapping.get(str(direction), ("-X", "+X"))
+
+
+def apply_directional_opening(window: Polygon, params: dict[str, Any]) -> Polygon:
+    """Stretch / chamfer an opening along waveDirection. No-op unless enabled."""
+    if window is None or window.is_empty:
+        return window
+    if not params.get("directionalOpeningEnabled"):
+        return window
+    direction = str(params.get("waveDirection", "+X"))
+    if direction not in {"+X", "-X", "+Y", "-Y"}:
+        return window
+    lead = float(params.get("solderLeadingExtensionMm", 0.0) or 0.0)
+    trail = float(params.get("solderTrailingExtensionMm", 0.0) or 0.0)
+    side = float(params.get("solderSideClearanceMm", 0.0) or 0.0)
+    entry_c = float(params.get("solderEntryChamferMm", 0.0) or 0.0)
+    exit_c = float(params.get("solderExitChamferMm", 0.0) or 0.0)
+    if lead <= 0 and trail <= 0 and side <= 0 and entry_c <= 0 and exit_c <= 0:
+        return window
+
+    extras = [window]
+    axis_x = direction in {"+X", "-X"}
+    leading_neg = direction in {"+X", "+Y"}
+    if axis_x:
+        extras.append(translate(window, xoff=-lead if leading_neg else lead))
+        extras.append(translate(window, xoff=trail if leading_neg else -trail))
+        if side > 0:
+            extras.append(translate(window, yoff=side))
+            extras.append(translate(window, yoff=-side))
+    else:
+        extras.append(translate(window, yoff=-lead if leading_neg else lead))
+        extras.append(translate(window, yoff=trail if leading_neg else -trail))
+        if side > 0:
+            extras.append(translate(window, xoff=side))
+            extras.append(translate(window, xoff=-side))
+
+    expanded = unary_union(extras)
+    if expanded.is_empty:
+        return window
+    expanded = _apply_end_chamfers(expanded, direction, entry_c, exit_c)
+    if expanded.geom_type == "MultiPolygon":
+        expanded = max(expanded.geoms, key=lambda g: g.area)
+    return expanded if not expanded.is_empty else window
+
+
+def _apply_end_chamfers(geom: Polygon, direction: str, entry: float, exit_c: float) -> Polygon:
+    if entry <= 0 and exit_c <= 0:
+        return geom
+    minx, miny, maxx, maxy = geom.bounds
+    cuts: list[Polygon] = []
+    if direction == "+X":
+        cuts.extend(_end_triangles(minx, miny, maxy, entry, inward=+1, vertical=False))
+        cuts.extend(_end_triangles(maxx, miny, maxy, exit_c, inward=-1, vertical=False))
+    elif direction == "-X":
+        cuts.extend(_end_triangles(maxx, miny, maxy, entry, inward=-1, vertical=False))
+        cuts.extend(_end_triangles(minx, miny, maxy, exit_c, inward=+1, vertical=False))
+    elif direction == "+Y":
+        cuts.extend(_end_triangles(miny, minx, maxx, entry, inward=+1, vertical=True))
+        cuts.extend(_end_triangles(maxy, minx, maxx, exit_c, inward=-1, vertical=True))
+    elif direction == "-Y":
+        cuts.extend(_end_triangles(maxy, minx, maxx, entry, inward=-1, vertical=True))
+        cuts.extend(_end_triangles(miny, minx, maxx, exit_c, inward=+1, vertical=True))
+    if not cuts:
+        return geom
+    try:
+        result = geom.difference(unary_union(cuts))
+    except Exception:
+        return geom
+    return result if not result.is_empty else geom
+
+
+def _end_triangles(edge: float, a0: float, a1: float, size: float, inward: int, vertical: bool) -> list[Polygon]:
+    if size <= 0:
+        return []
+    tris: list[Polygon] = []
+    for end in (a0, a1):
+        sign = 1 if end == a0 else -1
+        if vertical:
+            # edge is Y, a is X
+            tris.append(Polygon([
+                (end, edge),
+                (end + sign * size, edge),
+                (end, edge + inward * size),
+            ]))
+        else:
+            tris.append(Polygon([
+                (edge, end),
+                (edge + inward * size, end),
+                (edge, end + sign * size),
+            ]))
+    return tris
+
