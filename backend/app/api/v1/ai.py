@@ -89,6 +89,18 @@ async def ai_command(job_id: str, request: AICommandRequest, db: Session = Depen
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="任务不存在")
+    lowered = (request.userMessage or "").lower()
+    forbidden = (
+        "mark passed",
+        "mark case pass",
+        "accept mandatory",
+        "override blocking",
+        "write reference",
+        "modify golden",
+        "copy generated to reference",
+    )
+    if any(token in lowered for token in forbidden):
+        raise HTTPException(status_code=403, detail="AI cannot mark cases PASS, accept mandatory reviews, override blocking DRC, or write golden reference.")
     if job.status in {"parsing", "generating", "uploading"}:
         raise HTTPException(status_code=409, detail="任务正在处理中，请等待当前生成完成。")
 

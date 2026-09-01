@@ -1,40 +1,68 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { OverlayViewer } from "../components/validation/OverlayViewer";
 
 interface FeatureScore {
-  name: string;
+  name?: string;
+  feature?: string;
   status: string;
   iou?: number | null;
+  hausdorffMm?: number | null;
   hausdorff_mm?: number | null;
+  centroidErrorMm?: number | null;
   hole_position_error_mm?: number | null;
   hole_diameter_error_mm?: number | null;
-  expected_count?: number;
-  generated_count?: number;
+  generatedCount?: number;
+  referenceCount?: number;
   unmatched_feature_count?: number;
+}
+
+interface Manufacturing {
+  cnc?: { tested?: boolean; result?: string | null };
+  assembly?: { tested?: boolean; pcbFit?: string | null };
+  waveSolder?: { tested?: boolean; result?: string | null };
 }
 
 interface CaseItem {
   caseId: string;
   description: string;
   status: string;
+  lifecycle?: string;
+  kind?: string;
   hasInput: boolean;
   hasReferenceDxf: boolean;
   hasGeneratedDxf: boolean;
   hasReport: boolean;
   notes?: string;
-  report?: {
-    overall?: string;
-    features?: FeatureScore[];
-  } | null;
+  history?: { status: string; time: string }[];
+  manufacturing?: Manufacturing;
+  report?: { overall?: string; features?: FeatureScore[] } | null;
 }
+
+const FEATURES = [
+  "pcb_outline",
+  "fixture_body",
+  "sink",
+  "locating_pins",
+  "solder_openings",
+  "keepout_regions",
+  "clamps",
+  "spring_clips",
+  "solder_barriers",
+  "handholds",
+  "pressure_relief",
+  "conveyor_rails",
+];
 
 const STATUS_CLASS: Record<string, string> = {
   PASS: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10",
   WARNING: "text-amber-300 border-amber-500/40 bg-amber-500/10",
   FAIL: "text-rose-400 border-rose-500/40 bg-rose-500/10",
+  NOT_AVAILABLE: "text-slate-300 border-slate-500/40 bg-slate-500/10",
   passed: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10",
   failed: "text-rose-400 border-rose-500/40 bg-rose-500/10",
   review_required: "text-amber-300 border-amber-500/40 bg-amber-500/10",
   awaiting_input: "text-slate-300 border-slate-500/40 bg-slate-500/10",
+  awaiting_reference: "text-slate-300 border-slate-500/40 bg-slate-500/10",
   awaiting_reference_dxf: "text-slate-300 border-slate-500/40 bg-slate-500/10",
   ready: "text-sky-300 border-sky-500/40 bg-sky-500/10",
 };
@@ -47,35 +75,44 @@ function Badge({ value }: { value: string }) {
   );
 }
 
-function metric(features: FeatureScore[] | undefined, name: string, key: keyof FeatureScore): string {
-  const item = features?.find((f) => f.name === name);
-  const raw = item?.[key];
-  if (typeof raw === "number") return raw.toFixed(3);
-  return "—";
+function featureName(item: FeatureScore | undefined) {
+  return item?.feature || item?.name || "";
 }
 
-function statusOf(features: FeatureScore[] | undefined, name: string): string {
-  return features?.find((f) => f.name === name)?.status || "—";
+function findFeature(features: FeatureScore[] | undefined, name: string) {
+  return features?.find((f) => featureName(f) === name);
+}
+
+function num(value: number | null | undefined) {
+  return typeof value === "number" ? value.toFixed(3) : "—";
 }
 
 export const ValidationPage: React.FC = () => {
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [overlay, setOverlay] = useState<string>("");
+  const [overlay, setOverlay] = useState("");
+  const [filter, setFilter] = useState<string>("all");
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const selected = useMemo(() => cases.find((c) => c.caseId === selectedId) || null, [cases, selectedId]);
   const features = selected?.report?.features;
 
-  useEffect(() => {
+  const reload = () => {
     fetch("/api/validation/cases")
       .then((r) => r.json())
       .then((data) => {
         const list: CaseItem[] = data.cases || [];
         setCases(list);
-        if (list[0]) setSelectedId(list[0].caseId);
+        setSelectedId((prev) => prev || list[0]?.caseId || null);
       })
       .catch((e) => setError(String(e)));
+  };
+
+  useEffect(() => {
+    reload();
   }, []);
 
   useEffect(() => {
@@ -84,20 +121,69 @@ export const ValidationPage: React.FC = () => {
       .then((r) => r.text())
       .then(setOverlay)
       .catch(() => setOverlay(""));
-  }, [selectedId]);
+  }, [selectedId, selected?.hasGeneratedDxf, selected?.hasReport]);
+
+  const visibleFeatures = FEATURES.filter((name) => filter === "all" || filter === name);
+
+  const regenerate = async () => {
+    if (!selectedId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/validation/cases/${selectedId}/regenerate`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(body.detail || res.statusText);
+      }
+      reload();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitOverride = async () => {
+    if (!selectedId || !highlight || overrideReason.trim().length < 8) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/validation/cases/${selectedId}/overrides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: highlight === "locating_pins" ? "modify_locating_pin" : "modify_solder_opening",
+          featureId: highlight,
+          sourceIds: [],
+          newGeometry: { wkt: "POINT (0 0)" },
+          reason: overrideReason.trim(),
+          engineer: "field-engineer",
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(body.detail || res.statusText);
+      }
+      setOverrideReason("");
+      reload();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 overflow-auto bg-background text-on-background">
+    <div className="fixed inset-0 overflow-hidden bg-background text-on-background flex flex-col">
       <header className="h-14 border-b border-outline-variant px-4 flex items-center justify-between bg-surface">
         <div className="flex items-center gap-3">
           <a href="/" className="font-semibold text-primary-container">WAVE-FIXTURE</a>
-          <span className="text-on-surface-variant text-sm">Golden Validation</span>
+          <span className="text-on-surface-variant text-sm">Field Validation CAD QA</span>
         </div>
         <a href="/" className="text-xs text-on-surface-variant hover:text-on-surface">返回设计工作台</a>
       </header>
 
-      <div className="p-4 grid grid-cols-12 gap-4 min-h-[calc(100vh-56px)]">
-        <aside className="col-span-3 space-y-3">
+      <div className="flex-1 grid grid-cols-12 min-h-0">
+        <aside className="col-span-3 border-r border-outline-variant overflow-auto p-3 space-y-3">
           <h2 className="text-sm uppercase tracking-wider text-primary-container">Golden Cases</h2>
           {error && <div className="text-rose-400 text-sm">{error}</div>}
           {cases.map((item) => (
@@ -111,82 +197,112 @@ export const ValidationPage: React.FC = () => {
                 <Badge value={item.report?.overall || item.status} />
               </div>
               <p className="text-xs text-on-surface-variant line-clamp-3">{item.description}</p>
-              <div className="mt-2 grid grid-cols-2 gap-1 text-[10px] font-mono text-on-surface-variant">
-                <div>Fixture IoU {metric(item.report?.features, "fixture_outline", "iou")}</div>
-                <div>Sink IoU {metric(item.report?.features, "sink_region", "iou")}</div>
-                <div>Keepout {metric(item.report?.features, "keepout_regions", "iou")}</div>
-                <div>Solder {metric(item.report?.features, "solder_windows", "iou")}</div>
-                <div>Pin {metric(item.report?.features, "locating_pins", "hole_position_error_mm")}</div>
-                <div>Hole {metric(item.report?.features, "clamp_holes", "hole_position_error_mm")}</div>
-              </div>
+              <div className="mt-2 text-[10px] font-mono text-on-surface-variant">{item.lifecycle || "IMPORTED"} · {item.kind}</div>
             </button>
           ))}
         </aside>
 
-        <section className="col-span-9">
+        <section className="col-span-9 min-h-0 grid grid-rows-[auto_1fr_auto]">
           {!selected ? (
-            <div className="text-on-surface-variant">No case selected.</div>
+            <div className="p-4 text-on-surface-variant">No case selected.</div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
+            <>
+              <div className="p-3 border-b border-outline-variant flex items-center gap-3">
                 <h1 className="text-xl font-semibold">{selected.caseId}</h1>
                 <Badge value={selected.report?.overall || selected.status} />
+                <Badge value={selected.lifecycle || "IMPORTED"} />
+                <button className="ml-auto text-xs border px-2 py-1" disabled={busy} onClick={regenerate}>
+                  {busy ? "Working…" : "Regenerate"}
+                </button>
               </div>
-              <p className="text-sm text-on-surface-variant">{selected.description}</p>
-              <p className="text-xs text-amber-300">
-                Input PCB: {selected.hasInput ? "present" : "missing"} · Reference DXF: {selected.hasReferenceDxf ? "present" : "missing"} · Generated DXF: {selected.hasGeneratedDxf ? "present" : "missing"}
-              </p>
-              {selected.notes && <p className="text-xs text-on-surface-variant">{selected.notes}</p>}
-
-              <div className="grid grid-cols-3 gap-3 h-[420px]">
-                <div className="border border-outline-variant bg-surface-container p-2 flex flex-col">
-                  <div className="text-xs mb-2 text-on-surface-variant">Reference DXF</div>
-                  <div className="flex-1 flex items-center justify-center text-xs text-on-surface-variant">
-                    {selected.hasReferenceDxf ? "Engineer reference loaded" : "No engineer DXF — overlay unavailable"}
+              <div className="min-h-0 p-3">
+                <OverlayViewer
+                  svg={overlay}
+                  emptyMessage="awaiting engineer DXF"
+                  highlightFeature={highlight}
+                />
+              </div>
+              <div className="border-t border-outline-variant grid grid-cols-12 min-h-[220px]">
+                <div className="col-span-7 overflow-auto">
+                  <div className="flex items-center gap-2 p-2 text-xs">
+                    <span>Feature filter</span>
+                    <select value={filter} onChange={(e) => setFilter(e.target.value)} className="bg-surface border border-outline-variant text-xs">
+                      <option value="all">all</option>
+                      {FEATURES.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
                   </div>
+                  <table className="w-full text-xs font-mono">
+                    <thead className="bg-surface-container-low text-on-surface-variant">
+                      <tr>
+                        <th className="text-left p-2">Feature</th>
+                        <th className="text-left p-2">Status</th>
+                        <th className="text-left p-2">IoU</th>
+                        <th className="text-left p-2">Hausdorff</th>
+                        <th className="text-left p-2">Centroid</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleFeatures.map((name) => {
+                        const row = findFeature(features, name);
+                        const status = row?.status || "NOT_AVAILABLE";
+                        return (
+                          <tr
+                            key={name}
+                            className={`border-t border-outline-variant cursor-pointer ${highlight === name ? "bg-surface-container-high" : ""}`}
+                            onClick={() => setHighlight(name)}
+                            data-testid={`feature-row-${name}`}
+                          >
+                            <td className="p-2">{name}</td>
+                            <td className="p-2">
+                              <button
+                                className="underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setHighlight(name);
+                                }}
+                              >
+                                {status}
+                              </button>
+                            </td>
+                            <td className="p-2">{num(row?.iou)}</td>
+                            <td className="p-2">{num(row?.hausdorffMm ?? row?.hausdorff_mm)}</td>
+                            <td className="p-2">{num(row?.centroidErrorMm ?? row?.hole_position_error_mm)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="border border-outline-variant bg-surface-container p-2 flex flex-col">
-                  <div className="text-xs mb-2 text-on-surface-variant">Generated DXF</div>
-                  <div className="flex-1 flex items-center justify-center text-xs text-on-surface-variant">
-                    {selected.hasGeneratedDxf ? "Generated fixture available" : "Not generated"}
+                <div className="col-span-5 border-l border-outline-variant p-3 text-xs space-y-3 overflow-auto">
+                  <div>
+                    <h3 className="uppercase tracking-wide text-on-surface-variant mb-1">Software Validation</h3>
+                    <p>Status: {selected.report?.overall || selected.status}</p>
+                    <p>Input: {selected.hasInput ? "yes" : "no"} · Reference DXF: {selected.hasReferenceDxf ? "yes" : "no"}</p>
                   </div>
-                </div>
-                <div className="border border-outline-variant bg-black p-2 flex flex-col">
-                  <div className="text-xs mb-2 text-on-surface-variant">Difference Overlay</div>
-                  <div className="flex-1 overflow-hidden" dangerouslySetInnerHTML={{ __html: overlay }} />
-                  <div className="text-[10px] text-on-surface-variant mt-2 space-x-3">
-                    <span className="text-emerald-400">Green: match</span>
-                    <span className="text-amber-300">Amber: generated only</span>
-                    <span className="text-rose-400">Red: reference only</span>
+                  <div>
+                    <h3 className="uppercase tracking-wide text-on-surface-variant mb-1">Physical Validation</h3>
+                    <p>CNC: {selected.manufacturing?.cnc?.tested ? selected.manufacturing.cnc.result : "0 / not tested"}</p>
+                    <p>Assembly: {selected.manufacturing?.assembly?.tested ? selected.manufacturing.assembly.pcbFit : "0 / not tested"}</p>
+                    <p>Wave: {selected.manufacturing?.waveSolder?.tested ? selected.manufacturing.waveSolder.result : "0 / not tested"}</p>
+                  </div>
+                  <div>
+                    <h3 className="uppercase tracking-wide text-on-surface-variant mb-1">Engineer override</h3>
+                    <p className="text-on-surface-variant">Does not edit DXF. Structured JSON only. Reason required.</p>
+                    <textarea
+                      className="w-full h-16 bg-surface border border-outline-variant p-1"
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="why this feature must change"
+                    />
+                    <button className="mt-1 border px-2 py-1" disabled={busy || !highlight} onClick={submitOverride}>
+                      Save override for {highlight || "feature"}
+                    </button>
                   </div>
                 </div>
               </div>
-
-              <table className="w-full text-xs font-mono border border-outline-variant">
-                <thead className="bg-surface-container-low text-on-surface-variant">
-                  <tr>
-                    <th className="text-left p-2">Feature</th>
-                    <th className="text-left p-2">Status</th>
-                    <th className="text-left p-2">IoU</th>
-                    <th className="text-left p-2">Hausdorff</th>
-                    <th className="text-left p-2">Hole pos</th>
-                    <th className="text-left p-2">Unmatched</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {["fixture_outline", "sink_region", "keepout_regions", "solder_windows", "locating_pins", "clamp_holes", "spring_clips", "rails", "barriers"].map((name) => (
-                    <tr key={name} className="border-t border-outline-variant">
-                      <td className="p-2">{name}</td>
-                      <td className="p-2">{statusOf(features, name)}</td>
-                      <td className="p-2">{metric(features, name, "iou")}</td>
-                      <td className="p-2">{metric(features, name, "hausdorff_mm")}</td>
-                      <td className="p-2">{metric(features, name, "hole_position_error_mm")}</td>
-                      <td className="p-2">{features?.find((f) => f.name === name)?.unmatched_feature_count ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            </>
           )}
         </section>
       </div>

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,29 +12,20 @@ from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
+from validation.feature_thresholds import FEATURE_KEYS, decide_status
 from validation.geometry_comparator import GeometryComparator, PolygonComparisonResult
 from validation.manual_dxf_parser import CircleFeature, ManualFixtureData, ManualFixtureDxfParser
 
 
 CASE_STATUSES = (
     "awaiting_input",
+    "awaiting_reference",
     "awaiting_reference_dxf",
     "ready",
     "passed",
     "failed",
     "review_required",
-)
-
-FEATURE_KEYS = (
-    "fixture_outline",
-    "sink_region",
-    "keepout_regions",
-    "solder_windows",
-    "locating_pins",
-    "clamp_holes",
-    "spring_clips",
-    "rails",
-    "barriers",
+    "NOT_AVAILABLE",
 )
 
 
@@ -55,7 +46,28 @@ class FeatureScore:
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = {
+            "feature": self.name,
+            "status": self.status,
+            "generatedCount": self.generated_count,
+            "referenceCount": self.expected_count,
+            "iou": self.iou,
+            "hausdorffMm": self.hausdorff_mm,
+            "centroidErrorMm": self.centroid_distance_mm,
+            "areaErrorPercent": self.area_error_pct,
+            "diameterErrorMm": self.hole_diameter_error_mm,
+            "notes": self.notes,
+            "name": self.name,
+            "hausdorff_mm": self.hausdorff_mm,
+            "centroid_distance_mm": self.centroid_distance_mm,
+            "area_error_pct": self.area_error_pct,
+            "hole_position_error_mm": self.hole_position_error_mm,
+            "hole_diameter_error_mm": self.hole_diameter_error_mm,
+            "expected_count": self.expected_count,
+            "generated_count": self.generated_count,
+            "unmatched_feature_count": self.unmatched_feature_count,
+        }
+        return payload
 
 
 @dataclass
@@ -107,7 +119,7 @@ def _as_polygon_like(value: Any) -> BaseGeometry | None:
 
 def _score_polygon(name: str, expected: BaseGeometry | None, generated: BaseGeometry | None) -> FeatureScore:
     if expected is None and generated is None:
-        return FeatureScore(name=name, status="PASS", notes=["both empty"])
+        return FeatureScore(name=name, status="NOT_AVAILABLE", notes=["no geometry on either side"])
     if expected is None or generated is None:
         return FeatureScore(
             name=name,
@@ -121,7 +133,15 @@ def _score_polygon(name: str, expected: BaseGeometry | None, generated: BaseGeom
     centroid = expected.centroid.distance(generated.centroid)
     area_err = _pct(expected.area, generated.area)
     peri_err = _pct(expected.length, generated.length)
-    status = _polygon_status(cmp, centroid, area_err)
+    status = decide_status(
+        name,
+        {
+            "iou": cmp.iou,
+            "hausdorffMm": cmp.hausdorff_distance_mm,
+            "centroidErrorMm": centroid,
+            "areaErrorPercent": area_err,
+        },
+    )
     return FeatureScore(
         name=name,
         status=status,
@@ -136,38 +156,37 @@ def _score_polygon(name: str, expected: BaseGeometry | None, generated: BaseGeom
     )
 
 
-def _polygon_status(cmp: PolygonComparisonResult, centroid: float, area_err: float) -> str:
-    if cmp.iou >= 0.92 and cmp.hausdorff_distance_mm <= 1.5 and centroid <= 1.0 and area_err <= 8.0:
-        return "PASS"
-    if cmp.iou >= 0.75 and cmp.hausdorff_distance_mm <= 4.0:
-        return "WARNING"
-    return "FAIL"
-
-
 def _score_multi(name: str, expected: list[Polygon], generated: list[Polygon]) -> FeatureScore:
+    if not expected and not generated:
+        return FeatureScore(name=name, status="NOT_AVAILABLE", notes=["no geometry on either side"])
     result = GeometryComparator().compare_multi_polygon(expected, generated)
     unmatched = result.unmatched_expected + result.unmatched_generated
-    centroid_errors: list[float] = []
     area_errors: list[float] = []
     peri_errors: list[float] = []
+    centroid_errors: list[float] = []
     for exp, pair in zip(expected, result.per_pair):
-        # per_pair aligns to matched pairs only; centroid from pair metrics if available
         area_errors.append(_pct(1.0, 1.0 + (pair.area_difference_mm2 / max(exp.area, 1e-6))) if exp.area else 0.0)
         peri_errors.append(_pct(exp.length, exp.length + pair.perimeter_difference_mm) if exp.length else 0.0)
-    status = "PASS"
-    if unmatched > 0 or (result.average_iou < 0.75 and result.expected_count > 0):
-        status = "FAIL"
-    elif result.average_iou < 0.92 or result.average_hausdorff_mm > 1.5:
-        status = "WARNING"
-    if result.expected_count == 0 and result.generated_count == 0:
-        status = "PASS"
+        centroid_errors.append(pair.hausdorff_distance_mm)
+    mean_area = sum(area_errors) / len(area_errors) if area_errors else None
+    status = decide_status(
+        name,
+        {
+            "iou": result.average_iou,
+            "hausdorffMm": result.average_hausdorff_mm,
+            "centroidErrorMm": (sum(centroid_errors) / len(centroid_errors)) if centroid_errors else None,
+            "areaErrorPercent": mean_area,
+        },
+        unmatched=unmatched,
+        count_diff=abs(result.expected_count - result.generated_count),
+    )
     return FeatureScore(
         name=name,
         status=status,
         iou=result.average_iou,
         hausdorff_mm=result.average_hausdorff_mm,
         centroid_distance_mm=sum(centroid_errors) / len(centroid_errors) if centroid_errors else None,
-        area_error_pct=sum(area_errors) / len(area_errors) if area_errors else None,
+        area_error_pct=mean_area,
         perimeter_error_pct=sum(peri_errors) / len(peri_errors) if peri_errors else None,
         expected_count=result.expected_count,
         generated_count=result.generated_count,
@@ -176,6 +195,8 @@ def _score_multi(name: str, expected: list[Polygon], generated: list[Polygon]) -
 
 
 def _score_holes(name: str, expected: list[CircleFeature], generated: list[dict[str, Any]]) -> FeatureScore:
+    if not expected and not generated:
+        return FeatureScore(name=name, status="NOT_AVAILABLE", notes=["no holes on either side"])
     results = GeometryComparator().compare_circles(expected, generated)
     unmatched = sum(1 for r in results if math.isinf(r.center_error_mm))
     unmatched += max(0, len(generated) - len(results) + unmatched)
@@ -183,19 +204,21 @@ def _score_holes(name: str, expected: list[CircleFeature], generated: list[dict[
     pos = sum(r.center_error_mm for r in valid) / len(valid) if valid else (float("inf") if expected else 0.0)
     dia = sum(r.diameter_error_mm for r in valid) / len(valid) if valid else (float("inf") if expected else 0.0)
     count_diff = abs(len(expected) - len(generated))
-    if not expected and not generated:
-        status = "PASS"
-    elif unmatched > 0 or count_diff > 0 or pos > 1.0 or dia > 0.3:
-        status = "FAIL" if unmatched > 0 or pos > 2.5 or count_diff > 1 else "WARNING"
-    elif pos > 0.4 or dia > 0.15:
-        status = "WARNING"
-    else:
-        status = "PASS"
+    status = decide_status(
+        name,
+        {
+            "centroidErrorMm": None if math.isinf(pos) else pos,
+            "diameterErrorMm": None if math.isinf(dia) else dia,
+        },
+        unmatched=unmatched,
+        count_diff=count_diff,
+    )
     return FeatureScore(
         name=name,
         status=status,
         hole_position_error_mm=None if math.isinf(pos) else pos,
         hole_diameter_error_mm=None if math.isinf(dia) else dia,
+        centroid_distance_mm=None if math.isinf(pos) else pos,
         expected_count=len(expected),
         generated_count=len(generated),
         unmatched_feature_count=unmatched + count_diff,
@@ -213,22 +236,29 @@ def _as_polys(value: Any) -> list[Polygon]:
 
 
 def compare_fixture(manual: ManualFixtureData, generated: dict[str, Any], case_id: str) -> ValidationVerdict:
+    pcb_outline = generated.get("pcb_outline")
     features = [
-        _score_polygon("fixture_outline", _union(manual.fixture_outline), _as_polygon_like(generated.get("fixture_outline"))),
-        _score_polygon("sink_region", _union(manual.sink_region), _as_polygon_like(generated.get("sink_area"))),
+        _score_polygon("pcb_outline", _union(manual.pcb_outline), _as_polygon_like(pcb_outline)),
+        _score_polygon("fixture_body", _union(manual.fixture_outline), _as_polygon_like(generated.get("fixture_outline"))),
+        _score_polygon("sink", _union(manual.sink_region), _as_polygon_like(generated.get("sink_area"))),
         _score_multi("keepout_regions", list(manual.keepout_regions), _as_polys(generated.get("keepout_zones"))),
-        _score_multi("solder_windows", list(manual.solder_regions), _as_polys(generated.get("solder_windows"))),
+        _score_multi("solder_openings", list(manual.solder_regions), _as_polys(generated.get("solder_windows"))),
         _score_holes("locating_pins", list(manual.locating_pins), list(generated.get("pins") or [])),
-        _score_holes("clamp_holes", list(manual.clamp_holes), list(generated.get("clips") or [])),
+        _score_holes("clamps", list(manual.clamp_holes), list(generated.get("clips") or [])),
         _score_holes("spring_clips", list(manual.spring_clips), list(generated.get("spring_clips") or [])),
-        _score_multi("rails", list(manual.rails), _as_polys(generated.get("rails"))),
-        _score_multi("barriers", list(manual.solder_barriers), _as_polys(generated.get("solder_barriers"))),
+        _score_multi("solder_barriers", list(manual.solder_barriers), _as_polys(generated.get("solder_barriers"))),
+        _score_multi("handholds", list(manual.handholds), _as_polys(generated.get("handholds"))),
+        _score_multi("pressure_relief", list(manual.pressure_relief), _as_polys(generated.get("pressure_relief_channels"))),
+        _score_multi("conveyor_rails", list(manual.rails), _as_polys(generated.get("rails"))),
     ]
-    statuses = {f.status for f in features}
-    if "FAIL" in statuses:
+    comparable = [f.status for f in features if f.status != "NOT_AVAILABLE"]
+    if not comparable:
+        overall = "NOT_AVAILABLE"
+        case_status = "awaiting_reference"
+    elif "FAIL" in comparable:
         overall = "FAIL"
         case_status = "failed"
-    elif "WARNING" in statuses:
+    elif "WARNING" in comparable:
         overall = "WARNING"
         case_status = "review_required"
     else:
@@ -269,9 +299,10 @@ def overlay_svg(manual: ManualFixtureData, generated: dict[str, Any]) -> str:
 
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{minx-pad} {miny-pad} {maxx-minx+2*pad} {maxy-miny+2*pad}">'
-        f'<g id="match">{path(inter, "#22c55e", 0.35)}</g>'
-        f'<g id="generated-only">{path(only_gen, "#f59e0b", 0.45)}</g>'
-        f'<g id="reference-only">{path(only_ref, "#ef4444", 0.45)}</g>'
+        f'<g id="generated" data-layer="generated">{path(gen, "#3b82f6", 0.28)}</g>'
+        f'<g id="reference" data-layer="reference">{path(ref, "#22c55e", 0.28)}</g>'
+        f'<g id="overlap" data-layer="overlap">{path(inter, "#94a3b8", 0.35)}</g>'
+        f'<g id="difference" data-layer="difference">{path(only_gen, "#f59e0b", 0.55)}{path(only_ref, "#ef4444", 0.55)}</g>'
         "</svg>"
     )
 

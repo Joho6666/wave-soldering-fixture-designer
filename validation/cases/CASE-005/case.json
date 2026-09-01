@@ -1,0 +1,34 @@
+{
+  "caseId": "CASE-005",
+  "kind": "synthetic_demo",
+  "description": "Same demo ZIP with no PnP and no BOM, so mandatory reviews stay open. Not a customer board.",
+  "pcbInput": "input/gerber.zip",
+  "referenceDxf": null,
+  "fixtureParameters": {},
+  "processProfile": {},
+  "expectedFeatures": {},
+  "status": "awaiting_reference",
+  "lifecycle": "GENERATED",
+  "history": [
+    {
+      "status": "IMPORTED",
+      "time": "2026-09-01T00:00:00+00:00"
+    },
+    {
+      "status": "ENGINEER_REVIEW",
+      "time": "2026-09-01T00:00:00+00:00"
+    },
+    {
+      "status": "PARSED",
+      "time": "2026-09-01T09:20:49+00:00"
+    },
+    {
+      "status": "GENERATED",
+      "time": "2026-09-01T09:20:49+00:00"
+    }
+  ],
+  "hasReference": false,
+  "engineer": null,
+  "createdAt": "2026-09-01T00:00:00+00:00",
+  "notes": "synthetic_demo. Missing PnP/BOM. Engineer review expected. No engineer DXF."
+}

@@ -1,0 +1,30 @@
+{
+  "caseId": "CASE-004",
+  "kind": "synthetic_demo",
+  "description": "Chinese ZIP entry names of the same outline+drill geometry. Encoding robustness only.",
+  "pcbInput": "input/gerber.zip",
+  "referenceDxf": null,
+  "fixtureParameters": {},
+  "processProfile": {},
+  "expectedFeatures": {},
+  "status": "awaiting_reference",
+  "lifecycle": "GENERATED",
+  "history": [
+    {
+      "status": "IMPORTED",
+      "time": "2026-09-01T00:00:00+00:00"
+    },
+    {
+      "status": "PARSED",
+      "time": "2026-09-01T09:20:48+00:00"
+    },
+    {
+      "status": "GENERATED",
+      "time": "2026-09-01T09:20:48+00:00"
+    }
+  ],
+  "hasReference": false,
+  "engineer": null,
+  "createdAt": "2026-09-01T00:00:00+00:00",
+  "notes": "synthetic_demo. Geometry identical to CASE-002. Filenames rewritten. No engineer DXF."
+}
