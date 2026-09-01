@@ -70,7 +70,7 @@ def test_import_cli_does_not_invent_reference(tmp_path, monkeypatch):
 
 
 def test_override_requires_reason_and_updates_sha():
-    from app.models.geometry import DrillHit, PCBGeometry
+    from app.models.geometry import DrillHit, FixtureRegion, PCBGeometry
     from app.services.fixture.generator import FixtureGenerator
 
     pcb = PCBGeometry(
@@ -81,9 +81,26 @@ def test_override_requires_reason_and_updates_sha():
         geometry_sha256="g",
     )
     result = FixtureGenerator({"pcb_geometry": pcb}).generate({})
+    first = box(1, 1, 4, 4)
+    second = box(20, 20, 28, 26)
+    result["solder_windows"] = [first, second]
+    fg = result["fixture_geometry"]
+    fg.solder_regions = [first, second]
+    fg.solder_region_meta = [
+        FixtureRegion("SO-01", "solder_opening", first, "manual", ("J1",), 1.0),
+        FixtureRegion("SO-05", "solder_opening", second, "manual", ("J3",), 1.0),
+    ]
     old_sha = result["geometrySha256"]
     with pytest.raises(ValueError):
         validate_override({"type": "modify_solder_opening", "featureId": "SO-05", "newGeometry": {"wkt": "POLYGON((0 0,1 0,1 1,0 1,0 0))"}, "reason": "short", "engineer": "a"})
+    with pytest.raises(ValueError):
+        validate_override({
+            "type": "modify_solder_opening",
+            "featureId": "SO-05",
+            "newGeometry": {"wkt": "POINT (0 0)"},
+            "reason": "connector requires larger solder access",
+            "engineer": "qa",
+        })
     record = validate_override({
         "type": "modify_solder_opening",
         "featureId": "SO-05",
@@ -95,6 +112,8 @@ def test_override_requires_reason_and_updates_sha():
     })
     updated = apply_overrides(result, [record])
     assert updated["geometrySha256"] != old_sha
+    assert updated["solder_windows"][0].equals(first)
+    assert abs(updated["solder_windows"][1].bounds[0] - 10) < 1e-6
 
 
 def test_lifecycle_history_appends():

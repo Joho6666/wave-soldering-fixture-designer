@@ -31,8 +31,6 @@ def generate_pressure_relief(
     half = max(width / 2.0, 0.2)
 
     obstacles: list[BaseGeometry] = []
-    if pcb_outline is not None and not pcb_outline.is_empty:
-        obstacles.append(pcb_outline.buffer(min_web * 0.5))
     for s in solder_regions:
         if s is not None and not s.is_empty:
             obstacles.append(s.buffer(min_web))

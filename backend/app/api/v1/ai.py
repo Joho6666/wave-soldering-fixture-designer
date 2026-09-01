@@ -160,6 +160,9 @@ async def ai_command(job_id: str, request: AICommandRequest, db: Session = Depen
         job.parameters = FixtureParameters.model_validate(merged).model_dump()
 
     elif isinstance(command, SetLocatingPinsCommand):
+        from app.api.v1.jobs import _validate_manual_pins
+
+        _validate_manual_pins(command.pinDrillIds, job.result_data or {})
         manual_pins = command.pinDrillIds
 
     elif isinstance(command, AddCustomRegionCommand):

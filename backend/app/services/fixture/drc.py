@@ -473,8 +473,6 @@ def _pressure_relief_drc(fixture: FixtureGeometry, min_web: float) -> list[dict]
     if not channels:
         return issues
     obstacles: list[tuple[str, BaseGeometry]] = []
-    if fixture.pcb.outline is not None:
-        obstacles.append(("pcb", fixture.pcb.outline))
     for i, s in enumerate(fixture.solder_regions or []):
         obstacles.append((f"solder-{i+1}", s))
     for pin in fixture.locating_pins or []:

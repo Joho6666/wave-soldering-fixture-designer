@@ -215,6 +215,7 @@ def _merge_close(
                     changed = True
             nxt.append(acc)
             if acc_meta is not None:
+                acc_meta.geometry = acc
                 nxt_m.append(acc_meta)
         merged, merged_metas = nxt, nxt_m
     return merged, merged_metas

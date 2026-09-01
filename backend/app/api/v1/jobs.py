@@ -39,6 +39,23 @@ from app.tasks.process_job import add_log, process_gerber_job, process_job_backg
 router = APIRouter()
 
 
+def _validate_manual_pins(manual_pins: list, result_data: dict) -> None:
+    known = list(result_data.get("locatingCandidates") or [])
+    for pin_id in manual_pins:
+        matched = None
+        for candidate in known:
+            if candidate.get("drillId") == pin_id or candidate.get("id") == pin_id or f"pin-{candidate.get('drillId')}" == pin_id:
+                matched = candidate
+                break
+        if matched is None:
+            raise HTTPException(status_code=422, detail=f"定位销 '{pin_id}' 不存在于当前 PCB 钻孔列表中")
+        if float(matched.get("diameterMm") or 0) < 2.0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"定位销 '{pin_id}' 孔径 {float(matched.get('diameterMm') or 0):.2f}mm 过小 (最小 2.0mm)",
+            )
+
+
 def _safe_upload_name(filename: str | None) -> str:
     raw = (filename or "").replace("\\", "/")
     name = Path(raw).name.strip()
@@ -228,17 +245,19 @@ async def complete_all_reviews(
         raise HTTPException(status_code=404, detail="任务不存在")
     
     reviews = (job.result_data or {}).get("reviewItems", [])
-    pending_mandatory = [
+    unresolved_mandatory = [
         r for r in reviews
-        if r.get("mandatory", True) and r.get("status") == "pending"
+        if r.get("mandatory", True) and r.get("status") not in {"accepted", "modified"}
     ]
-    if pending_mandatory:
+    if unresolved_mandatory:
+        rejected = [r for r in unresolved_mandatory if r.get("status") == "rejected"]
+        code = "REJECTED_MANDATORY_REVIEWS" if rejected else "PENDING_REVIEWS_EXIST"
         raise HTTPException(
             status_code=409,
             detail={
-                "code": "PENDING_REVIEWS_EXIST",
-                "message": f"仍有 {len(pending_mandatory)} 个强制审核项未处理",
-                "pendingIds": [r["id"] for r in pending_mandatory],
+                "code": code,
+                "message": f"仍有 {len(unresolved_mandatory)} 个强制审核项未接受（含拒绝 {len(rejected)} 项）",
+                "pendingIds": [r["id"] for r in unresolved_mandatory],
             }
         )
 
@@ -324,27 +343,7 @@ async def regenerate(
     custom_regions = request.customRegions if request and request.customRegions is not None else (job.result_data or {}).get("customRegions", [])
 
     if manual_pins and job.result_data:
-        known_holes = {
-            h.get("id", ""): h
-            for h in (job.result_data.get("locatingCandidates") or [])
-        }
-        all_drill_ids = {c.get("drillId", "") for c in known_holes.values()}
-        for pin_id in manual_pins:
-            matched = None
-            for c in known_holes.values():
-                if c.get("drillId") == pin_id or c.get("id") == pin_id or f"pin-{c.get('drillId')}" == pin_id:
-                    matched = c
-                    break
-            if matched is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"定位销 '{pin_id}' 不存在于当前 PCB 钻孔列表中"
-                )
-            if matched.get("diameterMm", 0) < 2.0:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"定位销 '{pin_id}' 孔径 {matched.get('diameterMm', 0):.2f}mm 过小 (最小 2.0mm)"
-                )
+        _validate_manual_pins(manual_pins, job.result_data)
 
     existing_reviews = (job.result_data or {}).get("reviewItems", [])
     review_actions = {r["id"]: r["status"] for r in existing_reviews if r.get("status") in {"accepted", "rejected", "modified"}}
@@ -457,10 +456,10 @@ def _compute_production_gate(job: Job) -> ProductionGateResult:
     reviews = result_data.get("reviewItems", [])
     blocking_reviews = sum(
         1 for r in reviews
-        if r.get("mandatory", True) and r.get("status") == "pending"
+        if r.get("mandatory", True) and r.get("status") not in {"accepted", "modified"}
     )
     if blocking_reviews > 0:
-        reasons.append(f"{blocking_reviews} 个强制审核项待确认")
+        reasons.append(f"{blocking_reviews} 个强制审核项未接受（含拒绝项）")
 
     unconfirmed = 0
     if job.status == "layer_confirmation":

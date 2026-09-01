@@ -132,7 +132,12 @@ def api_regenerate(case_id: str):
     (report_dir / "metrics.json").write_text(json.dumps(verdict.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
     meta["status"] = verdict.status
-    persist_generated_lifecycle(case_dir, {**item, **meta, "hasReferenceDxf": True}, compared=True)
+    persist_generated_lifecycle(
+        case_dir,
+        {**item, **meta, "hasReferenceDxf": True},
+        compared=True,
+        overall=verdict.overall,
+    )
     payload = verdict.to_dict()
     payload["passed"] = verdict.overall == "PASS"
     return payload

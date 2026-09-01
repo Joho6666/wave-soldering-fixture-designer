@@ -20,9 +20,19 @@ export const InspectionPanel: React.FC = () => {
 
   const issues = fixtureResult.issues || [];
   const passedCount = issues.filter((issue) => issue.severity === "info").length;
-  const hasPendingReview = (fixtureResult.reviewItems || []).some((item) => item.mandatory && item.status === "pending");
-  const hasBlockingDrc = issues.some((issue) => (issue.severity === "blocking" || issue.severity === "error") && !issue.confirmed);
-  const canDownloadProduction = !hasPendingReview && !hasBlockingDrc;
+  const sha = fixtureResult.geometrySha256;
+  const overridden = new Set(
+    (fixtureResult.drcOverrides || [])
+      .filter((item) => (item.status || "active") === "active" && item.geometrySha256 === sha && sha)
+      .map((item) => item.issueId),
+  );
+  const hasUnresolvedReview = (fixtureResult.reviewItems || []).some(
+    (item) => item.mandatory && item.status !== "accepted" && item.status !== "modified",
+  );
+  const hasBlockingDrc = issues.some(
+    (issue) => (issue.severity === "blocking" || issue.severity === "error") && !overridden.has(issue.id),
+  );
+  const canDownloadProduction = !hasUnresolvedReview && !hasBlockingDrc;
   const totalCount = issues.length;
   const reviewCount = (fixtureResult.reviewItems || []).filter((item) => item.mandatory && item.status === "pending").length;
   const checkLabel = jobStatus === "review_required"
@@ -289,7 +299,7 @@ export const InspectionPanel: React.FC = () => {
         <button
           onClick={handleDownloadDxf}
           disabled={isDownloading || !canDownloadProduction}
-          title={!canDownloadProduction ? `生产未就绪: ${hasPendingReview ? "存在待审核项 " : ""}${hasBlockingDrc ? "存在 DRC blocking/error" : ""}` : ""}
+          title={!canDownloadProduction ? `生产未就绪: ${hasUnresolvedReview ? "存在未接受的强制审核项 " : ""}${hasBlockingDrc ? "存在 DRC blocking/error" : ""}` : ""}
           className="w-full h-10 bg-primary-container text-on-primary-fixed font-headline-md text-body-md font-bold hover:bg-surface-tint glow-cyan transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isDownloading ? (

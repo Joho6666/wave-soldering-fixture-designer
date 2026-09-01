@@ -163,18 +163,15 @@ def _score_multi(name: str, expected: list[Polygon], generated: list[Polygon]) -
     unmatched = result.unmatched_expected + result.unmatched_generated
     area_errors: list[float] = []
     peri_errors: list[float] = []
-    centroid_errors: list[float] = []
     for exp, pair in zip(expected, result.per_pair):
         area_errors.append(_pct(1.0, 1.0 + (pair.area_difference_mm2 / max(exp.area, 1e-6))) if exp.area else 0.0)
         peri_errors.append(_pct(exp.length, exp.length + pair.perimeter_difference_mm) if exp.length else 0.0)
-        centroid_errors.append(pair.hausdorff_distance_mm)
     mean_area = sum(area_errors) / len(area_errors) if area_errors else None
     status = decide_status(
         name,
         {
             "iou": result.average_iou,
             "hausdorffMm": result.average_hausdorff_mm,
-            "centroidErrorMm": (sum(centroid_errors) / len(centroid_errors)) if centroid_errors else None,
             "areaErrorPercent": mean_area,
         },
         unmatched=unmatched,
@@ -185,7 +182,7 @@ def _score_multi(name: str, expected: list[Polygon], generated: list[Polygon]) -
         status=status,
         iou=result.average_iou,
         hausdorff_mm=result.average_hausdorff_mm,
-        centroid_distance_mm=sum(centroid_errors) / len(centroid_errors) if centroid_errors else None,
+        centroid_distance_mm=None,
         area_error_pct=mean_area,
         perimeter_error_pct=sum(peri_errors) / len(peri_errors) if peri_errors else None,
         expected_count=result.expected_count,
@@ -198,9 +195,10 @@ def _score_holes(name: str, expected: list[CircleFeature], generated: list[dict[
     if not expected and not generated:
         return FeatureScore(name=name, status="NOT_AVAILABLE", notes=["no holes on either side"])
     results = GeometryComparator().compare_circles(expected, generated)
-    unmatched = sum(1 for r in results if math.isinf(r.center_error_mm))
-    unmatched += max(0, len(generated) - len(results) + unmatched)
     valid = [r for r in results if not math.isinf(r.center_error_mm)]
+    unmatched_expected = sum(1 for r in results if math.isinf(r.center_error_mm))
+    unmatched_generated = max(0, len(generated) - len(valid))
+    unmatched = unmatched_expected + unmatched_generated
     pos = sum(r.center_error_mm for r in valid) / len(valid) if valid else (float("inf") if expected else 0.0)
     dia = sum(r.diameter_error_mm for r in valid) / len(valid) if valid else (float("inf") if expected else 0.0)
     count_diff = abs(len(expected) - len(generated))
@@ -221,7 +219,7 @@ def _score_holes(name: str, expected: list[CircleFeature], generated: list[dict[
         centroid_distance_mm=None if math.isinf(pos) else pos,
         expected_count=len(expected),
         generated_count=len(generated),
-        unmatched_feature_count=unmatched + count_diff,
+        unmatched_feature_count=unmatched,
     )
 
 
@@ -285,24 +283,39 @@ def overlay_svg(manual: ManualFixtureData, generated: dict[str, Any]) -> str:
     only_gen = gen.difference(ref) if ref is not None and gen is not None else gen
     only_ref = ref.difference(gen) if ref is not None and gen is not None else ref
 
-    def path(geom, color, opacity=0.45) -> str:
-        if geom is None or geom.is_empty:
+    def path(geom, color, opacity=0.45, feature: str | None = None) -> str:
+        if geom is None or getattr(geom, "is_empty", True):
             return ""
         geoms = list(geom.geoms) if geom.geom_type in {"MultiPolygon", "GeometryCollection"} else [geom]
         parts = []
+        attr = f' data-feature="{feature}"' if feature else ""
         for g in geoms:
             if g.geom_type != "Polygon":
                 continue
             d = " ".join(f"{x:.3f},{y:.3f}" for x, y in g.exterior.coords)
-            parts.append(f'<polygon points="{d}" fill="{color}" fill-opacity="{opacity}" stroke="{color}" stroke-width="0.2"/>')
+            parts.append(f'<polygon points="{d}" fill="{color}" fill-opacity="{opacity}" stroke="{color}" stroke-width="0.2"{attr}/>')
         return "".join(parts)
+
+    feature_groups = []
+    mapping = [
+        ("fixture_body", generated.get("fixture_outline"), _union(manual.fixture_outline)),
+        ("sink", generated.get("sink_area"), _union(manual.sink_region)),
+        ("solder_openings", _union(_as_polys(generated.get("solder_windows"))), _union(list(manual.solder_regions))),
+        ("keepout_regions", _union(_as_polys(generated.get("keepout_zones"))), _union(list(manual.keepout_regions))),
+        ("conveyor_rails", _union(_as_polys(generated.get("rails"))), _union(list(manual.rails))),
+        ("handholds", _union(_as_polys(generated.get("handholds"))), _union(list(manual.handholds))),
+        ("pressure_relief", _union(_as_polys(generated.get("pressure_relief_channels"))), _union(list(manual.pressure_relief))),
+    ]
+    for name, g_feat, r_feat in mapping:
+        feature_groups.append(f'<g id="feature-{name}" data-feature="{name}">{path(g_feat, "#3b82f6", 0.12, name)}{path(r_feat, "#22c55e", 0.12, name)}</g>')
 
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{minx-pad} {miny-pad} {maxx-minx+2*pad} {maxy-miny+2*pad}">'
-        f'<g id="generated" data-layer="generated">{path(gen, "#3b82f6", 0.28)}</g>'
-        f'<g id="reference" data-layer="reference">{path(ref, "#22c55e", 0.28)}</g>'
+        f'<g id="generated" data-layer="generated">{path(gen, "#3b82f6", 0.28, "fixture_body")}</g>'
+        f'<g id="reference" data-layer="reference">{path(ref, "#22c55e", 0.28, "fixture_body")}</g>'
         f'<g id="overlap" data-layer="overlap">{path(inter, "#94a3b8", 0.35)}</g>'
         f'<g id="difference" data-layer="difference">{path(only_gen, "#f59e0b", 0.55)}{path(only_ref, "#ef4444", 0.55)}</g>'
+        f'{"".join(feature_groups)}'
         "</svg>"
     )
 

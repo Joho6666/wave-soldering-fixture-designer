@@ -59,15 +59,8 @@ export const LayerConfirmModal: React.FC = () => {
   };
 
   const handleSkip = async () => {
-    setIsSubmitting(true);
-    try {
-      await confirmLayers(layersState);
-      toggleLayerConfirmModal(false);
-    } catch {
-      toggleLayerConfirmModal(false);
-    } finally {
-      setIsSubmitting(false);
-    }
+    toggleLayerConfirmModal(false);
+    showToast("已取消图层确认，生产 DXF 仍锁定，直到确认外形层。", "warning");
   };
 
   return (

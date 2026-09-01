@@ -116,7 +116,7 @@ def overlay_svg_generated_only(generated: dict[str, Any]) -> str:
     )
 
 
-def persist_generated_lifecycle(case_dir: Path, item: dict[str, Any], *, compared: bool) -> dict[str, Any]:
+def persist_generated_lifecycle(case_dir: Path, item: dict[str, Any], *, compared: bool, overall: str | None = None) -> dict[str, Any]:
     meta_path = case_dir / "case.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {"caseId": item["caseId"]}
     history = list(meta.get("history") or [])
@@ -124,8 +124,13 @@ def persist_generated_lifecycle(case_dir: Path, item: dict[str, Any], *, compare
     history = append_history(history, "GENERATED")
     if compared and item.get("hasReferenceDxf"):
         history = append_history(history, "REFERENCE_AVAILABLE")
-        history = append_history(history, "VALIDATED")
-        meta["lifecycle"] = "VALIDATED"
+        if overall == "PASS":
+            history = append_history(history, "VALIDATED")
+            meta["lifecycle"] = "VALIDATED"
+        else:
+            meta["lifecycle"] = "ENGINEER_REVIEW"
+        if item.get("status"):
+            meta["status"] = item["status"]
     else:
         meta["lifecycle"] = "GENERATED"
         meta["status"] = "awaiting_reference"

@@ -21,6 +21,7 @@ class Transform2D:
     ty: float = 0.0
     rotation_deg: float = 0.0
     mirror_x: bool = False
+    inverted: bool = False
 
     @classmethod
     def identity(cls) -> Transform2D:
@@ -31,6 +32,8 @@ class Transform2D:
         return cls(tx=float(tx), ty=float(ty))
 
     def apply_xy(self, x: float, y: float) -> tuple[float, float]:
+        if self.inverted:
+            return self._undo_xy(x, y)
         if self.mirror_x:
             x = -x
         rad = math.radians(self.rotation_deg)
@@ -40,7 +43,7 @@ class Transform2D:
         yr = sin_a * x + cos_a * y
         return xr + self.tx, yr + self.ty
 
-    def inverse_xy(self, x: float, y: float) -> tuple[float, float]:
+    def _undo_xy(self, x: float, y: float) -> tuple[float, float]:
         x = x - self.tx
         y = y - self.ty
         rad = math.radians(-self.rotation_deg)
@@ -52,6 +55,11 @@ class Transform2D:
             xr = -xr
         return xr, yr
 
+    def inverse_xy(self, x: float, y: float) -> tuple[float, float]:
+        if self.inverted:
+            return Transform2D(self.tx, self.ty, self.rotation_deg, self.mirror_x, inverted=False).apply_xy(x, y)
+        return self._undo_xy(x, y)
+
     def local_to_global(self, x: float, y: float) -> tuple[float, float]:
         return self.apply_xy(x, y)
 
@@ -62,6 +70,14 @@ class Transform2D:
         if geom is None or geom.is_empty:
             return geom
         g = geom
+        if self.inverted:
+            if abs(self.tx) > 1e-15 or abs(self.ty) > 1e-15:
+                g = translate(g, xoff=-self.tx, yoff=-self.ty)
+            if abs(self.rotation_deg) > 1e-12:
+                g = rotate(g, -self.rotation_deg, origin=(0.0, 0.0), use_radians=False)
+            if self.mirror_x:
+                g = scale(g, xfact=-1.0, yfact=1.0, origin=(0.0, 0.0))
+            return g
         if self.mirror_x:
             g = scale(g, xfact=-1.0, yfact=1.0, origin=(0.0, 0.0))
         if abs(self.rotation_deg) > 1e-12:
@@ -71,8 +87,13 @@ class Transform2D:
         return g
 
     def inverse(self) -> Transform2D:
-        ix, iy = self.inverse_xy(0.0, 0.0)
-        return Transform2D(tx=ix, ty=iy, rotation_deg=-self.rotation_deg, mirror_x=self.mirror_x)
+        return Transform2D(
+            tx=self.tx,
+            ty=self.ty,
+            rotation_deg=self.rotation_deg,
+            mirror_x=self.mirror_x,
+            inverted=not self.inverted,
+        )
 
     def apply_hole(self, hole: dict[str, Any]) -> dict[str, Any]:
         x, y = self.apply_xy(float(hole["x"]), float(hole["y"]))

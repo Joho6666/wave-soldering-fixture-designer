@@ -38,6 +38,15 @@ interface CaseItem {
   report?: { overall?: string; features?: FeatureScore[] } | null;
 }
 
+const FEATURE_OVERRIDE_TYPE: Record<string, string> = {
+  locating_pins: "modify_locating_pin",
+  clamps: "modify_clamp",
+  solder_openings: "modify_solder_opening",
+  keepout_regions: "modify_keepout",
+  sink: "modify_pocket",
+  pressure_relief: "modify_pressure_relief",
+};
+
 const FEATURES = [
   "pcb_outline",
   "fixture_body",
@@ -95,6 +104,7 @@ export const ValidationPage: React.FC = () => {
   const [filter, setFilter] = useState<string>("all");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
+  const [overrideWkt, setOverrideWkt] = useState("");
   const [busy, setBusy] = useState(false);
 
   const selected = useMemo(() => cases.find((c) => c.caseId === selectedId) || null, [cases, selectedId]);
@@ -144,17 +154,18 @@ export const ValidationPage: React.FC = () => {
   };
 
   const submitOverride = async () => {
-    if (!selectedId || !highlight || overrideReason.trim().length < 8) return;
+    const overrideType = highlight ? FEATURE_OVERRIDE_TYPE[highlight] : undefined;
+    if (!selectedId || !highlight || !overrideType || overrideReason.trim().length < 8 || !overrideWkt.trim()) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/validation/cases/${selectedId}/overrides`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: highlight === "locating_pins" ? "modify_locating_pin" : "modify_solder_opening",
+          type: overrideType,
           featureId: highlight,
           sourceIds: [],
-          newGeometry: { wkt: "POINT (0 0)" },
+          newGeometry: { wkt: overrideWkt.trim() },
           reason: overrideReason.trim(),
           engineer: "field-engineer",
         }),
@@ -296,7 +307,17 @@ export const ValidationPage: React.FC = () => {
                       onChange={(e) => setOverrideReason(e.target.value)}
                       placeholder="why this feature must change"
                     />
-                    <button className="mt-1 border px-2 py-1" disabled={busy || !highlight} onClick={submitOverride}>
+                    <textarea
+                      className="w-full h-16 bg-surface border border-outline-variant p-1 mt-1"
+                      value={overrideWkt}
+                      onChange={(e) => setOverrideWkt(e.target.value)}
+                      placeholder="newGeometry WKT (Polygon for openings/keepouts; never POINT 0 0)"
+                    />
+                    <button
+                      className="mt-1 border px-2 py-1"
+                      disabled={busy || !highlight || !FEATURE_OVERRIDE_TYPE[highlight || ""] || !overrideWkt.trim()}
+                      onClick={submitOverride}
+                    >
                       Save override for {highlight || "feature"}
                     </button>
                   </div>
