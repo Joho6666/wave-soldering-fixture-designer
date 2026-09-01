@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from shapely import wkt
-from shapely.geometry import Point, mapping
+from shapely.geometry import mapping
 
 ALLOWED_TYPES = {
     "modify_locating_pin",
@@ -19,7 +19,15 @@ ALLOWED_TYPES = {
     "modify_pressure_relief",
 }
 
+POLYGON_TYPES = {
+    "modify_solder_opening",
+    "modify_keepout",
+    "modify_pocket",
+    "modify_pressure_relief",
+}
+
 _FEATURE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
+_INDEX_RE = re.compile(r"(\d+)$")
 
 
 def utc_now() -> str:
@@ -48,6 +56,8 @@ def validate_override(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"invalid WKT: {exc}") from exc
     if geom.is_empty:
         raise ValueError("newGeometry is empty")
+    if kind in POLYGON_TYPES and geom.geom_type not in {"Polygon", "MultiPolygon"}:
+        raise ValueError(f"{kind} requires Polygon WKT, not {geom.geom_type}")
     record = {
         "type": kind,
         "featureId": feature_id,
@@ -89,56 +99,86 @@ def save_override(case_dir: Path, record: dict[str, Any]) -> Path:
     return path
 
 
-def _replace_or_append_polygon(items: list, geom, feature_id: str) -> None:
-    for idx, existing in enumerate(items):
-        ident = None
-        if hasattr(existing, "id"):
-            ident = existing.id
-        items[idx] = geom if ident == feature_id or idx == 0 and ident is None else existing
-    if not items:
-        items.append(geom)
-    else:
-        items[-1] = geom
+def _index_from_feature_id(feature_id: str, count: int) -> int | None:
+    match = _INDEX_RE.search(feature_id.replace("SO-", "").replace("so-", ""))
+    if not match:
+        return None
+    idx = int(match.group(1))
+    if idx == 0:
+        return 0 if count > 0 else None
+    idx -= 1
+    if 0 <= idx < count:
+        return idx
+    return None
+
+
+def _replace_polygon(geoms: list, metas: list, feature_id: str, geom) -> None:
+    for i, meta in enumerate(metas or []):
+        ident = getattr(meta, "id", None)
+        if ident == feature_id:
+            geoms[i] = geom
+            meta.geometry = geom
+            return
+    idx = _index_from_feature_id(feature_id, len(geoms))
+    if idx is None:
+        raise ValueError(f"featureId {feature_id} did not match a generated feature")
+    geoms[idx] = geom
+    if idx < len(metas):
+        metas[idx].geometry = geom
+
+
+def _replace_hole(items: list[dict[str, Any]], feature_id: str, centroid, diameter: float) -> list[dict[str, Any]]:
+    updated = False
+    for item in items:
+        if str(item.get("id")) == feature_id:
+            item["x"] = float(centroid.x)
+            item["y"] = float(centroid.y)
+            item["diameter"] = float(diameter)
+            updated = True
+    if not updated:
+        raise ValueError(f"featureId {feature_id} did not match a generated hole")
+    return items
 
 
 def apply_overrides(fixture_data: dict[str, Any], overrides: list[dict[str, Any]]) -> dict[str, Any]:
     """Apply structured overrides onto generated fixture dict before SHA/DRC/export."""
     from shapely import wkt as shapely_wkt
 
+    fg = fixture_data.get("fixture_geometry")
     for record in overrides:
         geom = shapely_wkt.loads(record["newGeometry"]["wkt"])
         kind = record["type"]
         feature_id = record["featureId"]
-        if kind in {"modify_solder_opening"}:
+        if kind == "modify_solder_opening":
             windows = list(fixture_data.get("solder_windows") or [])
-            if windows:
-                windows[0] = geom
-            else:
-                windows = [geom]
+            metas = list(getattr(fg, "solder_region_meta", None) or []) if fg is not None else []
+            if not windows:
+                raise ValueError("no solder openings to override")
+            _replace_polygon(windows, metas, feature_id, geom)
             fixture_data["solder_windows"] = windows
-            fg = fixture_data.get("fixture_geometry")
             if fg is not None:
                 fg.solder_regions = windows
+                fg.solder_region_meta = metas
         elif kind in {"modify_keepout", "modify_pocket"}:
             zones = list(fixture_data.get("keepout_zones") or [])
-            if zones:
-                zones[0] = geom
-            else:
-                zones = [geom]
+            metas = list(getattr(fg, "keepout_region_meta", None) or []) if fg is not None else []
+            if not zones:
+                raise ValueError("no keepout/pocket regions to override")
+            _replace_polygon(zones, metas, feature_id, geom)
             fixture_data["keepout_zones"] = zones
-            fg = fixture_data.get("fixture_geometry")
             if fg is not None:
                 fg.keepout_regions = zones
+                fg.keepout_region_meta = metas
         elif kind == "modify_pressure_relief":
             channels = list(fixture_data.get("pressure_relief_channels") or [])
-            if channels:
-                channels[0] = geom
-            else:
-                channels = [geom]
+            metas = list(getattr(fg, "pressure_relief_meta", None) or []) if fg is not None else []
+            if not channels:
+                raise ValueError("no pressure-relief channels to override")
+            _replace_polygon(channels, metas, feature_id, geom)
             fixture_data["pressure_relief_channels"] = channels
-            fg = fixture_data.get("fixture_geometry")
             if fg is not None:
                 fg.pressure_relief_channels = channels
+                fg.pressure_relief_meta = metas
         elif kind == "modify_locating_pin":
             centroid = geom.centroid if geom.geom_type != "Point" else geom
             diameter = 3.0
@@ -146,19 +186,9 @@ def apply_overrides(fixture_data: dict[str, Any], overrides: list[dict[str, Any]
                 minx, miny, maxx, maxy = geom.bounds
                 diameter = max(maxx - minx, maxy - miny)
             pins = list(fixture_data.get("pins") or [])
-            updated = False
-            for pin in pins:
-                if str(pin.get("id")) == feature_id:
-                    pin["x"] = float(centroid.x)
-                    pin["y"] = float(centroid.y)
-                    pin["diameter"] = float(diameter)
-                    updated = True
-            if not updated:
-                pins.append({"id": feature_id, "x": float(centroid.x), "y": float(centroid.y), "diameter": float(diameter)})
-            fixture_data["pins"] = pins
-            fg = fixture_data.get("fixture_geometry")
+            fixture_data["pins"] = _replace_hole(pins, feature_id, centroid, diameter)
             if fg is not None:
-                fg.locating_pins = pins
+                fg.locating_pins = fixture_data["pins"]
         elif kind == "modify_clamp":
             centroid = geom.centroid if geom.geom_type != "Point" else geom
             diameter = 3.4
@@ -166,21 +196,9 @@ def apply_overrides(fixture_data: dict[str, Any], overrides: list[dict[str, Any]
                 minx, miny, maxx, maxy = geom.bounds
                 diameter = max(maxx - minx, maxy - miny)
             clips = list(fixture_data.get("clips") or [])
-            updated = False
-            for clip in clips:
-                if str(clip.get("id")) == feature_id:
-                    clip["x"] = float(centroid.x)
-                    clip["y"] = float(centroid.y)
-                    clip["diameter"] = float(diameter)
-                    updated = True
-            if not updated:
-                clips.append({"id": feature_id, "x": float(centroid.x), "y": float(centroid.y), "diameter": float(diameter)})
-            fixture_data["clips"] = clips
-            fg = fixture_data.get("fixture_geometry")
+            fixture_data["clips"] = _replace_hole(clips, feature_id, centroid, diameter)
             if fg is not None:
-                fg.clamp_holes = clips
-        _ = Point  # keep import used for type checkers
-    fg = fixture_data.get("fixture_geometry")
+                fg.clamp_holes = fixture_data["clips"]
     if fg is not None:
         from app.geometry.digest import geometry_digest
         from app.services.fixture.drc import run_drc

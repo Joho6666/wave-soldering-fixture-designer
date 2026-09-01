@@ -90,6 +90,12 @@ def _auto_generate(gerber_zip_path: Path, output_dir: Path, fixture_parameters: 
 
         generator = FixtureGenerator({"pcb_geometry": pcb_geom})
         fixture_data = generator.generate(fixture_parameters or {})
+        from validation.overrides import apply_overrides, list_overrides
+
+        case_dir = output_dir.parent
+        overrides = list_overrides(case_dir)
+        if overrides:
+            fixture_data = apply_overrides(fixture_data, overrides)
 
         output_dir.mkdir(parents=True, exist_ok=True)
         export_fixture_dxf(fixture_data, str(output_dir / "fixture.dxf"))

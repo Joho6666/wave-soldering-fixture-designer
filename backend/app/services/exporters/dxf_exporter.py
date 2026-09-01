@@ -127,11 +127,25 @@ def export_fixture_dxf(layers_data: Dict[str, Any], output_path: str) -> str:
     fixture_geom = layers_data.get('fixture_geometry')
     if fixture_geom and hasattr(fixture_geom, 'pcb') and fixture_geom.pcb:
         for hole in fixture_geom.pcb.holes:
-            msp.add_circle(
-                center=(hole.x, hole.y),
-                radius=hole.diameter_mm / 2,
-                dxfattribs={'layer': 'PCB_DRILL'}
-            )
+            if getattr(hole, "kind", "hole") == "slot" and hole.slot_width_mm and hole.slot_length_mm:
+                hw = float(hole.slot_width_mm) / 2.0
+                hl = float(hole.slot_length_mm) / 2.0
+                msp.add_lwpolyline(
+                    [
+                        (hole.x - hl, hole.y - hw),
+                        (hole.x + hl, hole.y - hw),
+                        (hole.x + hl, hole.y + hw),
+                        (hole.x - hl, hole.y + hw),
+                    ],
+                    close=True,
+                    dxfattribs={'layer': 'PCB_DRILL'},
+                )
+            else:
+                msp.add_circle(
+                    center=(hole.x, hole.y),
+                    radius=hole.diameter_mm / 2,
+                    dxfattribs={'layer': 'PCB_DRILL'}
+                )
 
     doc.saveas(output_path)
     # Read-back validation
@@ -221,8 +235,14 @@ def _draw_polygon(msp, geometry, layer: str):
     if geometry.geom_type != "Polygon":
         raise TypeError(f"DXF 图层 {layer} 不支持几何类型 {geometry.geom_type}")
     msp.add_lwpolyline(list(geometry.exterior.coords), close=True, dxfattribs={'layer': layer})
+    hole_layer = f"{layer}_HOLE"
+    if geometry.interiors and hole_layer not in {lyr.dxf.name for lyr in msp.doc.layers}:
+        try:
+            msp.doc.layers.new(hole_layer, dxfattribs={'color': 1})
+        except Exception:
+            pass
     for interior in geometry.interiors:
-        msp.add_lwpolyline(list(interior.coords), close=True, dxfattribs={'layer': layer})
+        msp.add_lwpolyline(list(interior.coords), close=True, dxfattribs={'layer': hole_layer})
 
 
 def export_fixture_svg(layers_data: Dict[str, Any], output_path: str) -> str:
@@ -478,17 +498,28 @@ def add_preview_watermark(source_path: str, output_path: str) -> str:
         bbox = msp.query('*').first.dxf
     except Exception:
         pass
-    min_x, min_y, max_x, max_y = 0, 0, 300, 200
+    min_x, min_y, max_x, max_y = None, None, None, None
     for entity in msp:
         try:
-            eb = entity.dxf
-            if hasattr(eb, 'start'):
-                min_x = min(min_x, eb.start.x)
-                min_y = min(min_y, eb.start.y)
-                max_x = max(max_x, eb.start.x)
-                max_y = max(max_y, eb.start.y)
+            if hasattr(entity, "dxf") and hasattr(entity.dxf, "center"):
+                x, y = entity.dxf.center.x, entity.dxf.center.y
+                r = float(getattr(entity.dxf, "radius", 0) or 0)
+                pts = [(x - r, y - r), (x + r, y + r)]
+            elif entity.dxftype() == "LWPOLYLINE":
+                pts = [(p[0], p[1]) for p in entity.get_points("xy")]
+            elif hasattr(entity.dxf, "start"):
+                pts = [(entity.dxf.start.x, entity.dxf.start.y), (entity.dxf.end.x, entity.dxf.end.y)]
+            else:
+                continue
+            for x, y in pts:
+                min_x = x if min_x is None else min(min_x, x)
+                min_y = y if min_y is None else min(min_y, y)
+                max_x = x if max_x is None else max(max_x, x)
+                max_y = y if max_y is None else max(max_y, y)
         except Exception:
             continue
+    if min_x is None:
+        min_x, min_y, max_x, max_y = 0, 0, 300, 200
     cx = (min_x + max_x) / 2
     cy = (min_y + max_y) / 2
     msp.add_text(

@@ -38,6 +38,7 @@ interface BackendFixtureResult {
   customRegions?: FixtureResult["customRegions"];
   status?: "completed" | "review_required" | "failed";
   geometrySha256?: string;
+  drcOverrides?: FixtureResult["drcOverrides"];
   issues: Array<{
     id: string;
     code?: string;
@@ -145,6 +146,7 @@ function toFixtureResult(
     locatingCandidates: result.locatingCandidates || [],
     previewSvg,
     geometrySha256: result.geometrySha256,
+    drcOverrides: result.drcOverrides || (result as any).drcOverrides || [],
     algorithmVersion: (result as any).algorithmVersion,
     softwareVersion: (result as any).softwareVersion,
     ruleProfileVersion: (result as any).ruleProfileVersion,

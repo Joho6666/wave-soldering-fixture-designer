@@ -13,6 +13,14 @@ MACHINING_PARAM_KEYS = (
     "pocketFloorThicknessMm",
     "defaultPocketDepthMm",
     "componentVerticalClearanceMm",
+    "minimumMaterialWebMm",
+    "solderMinOpeningWidthMm",
+    "solderClearanceMm",
+    "keepoutClearanceMm",
+    "fixtureMarginXmm",
+    "fixtureMarginYmm",
+    "railWidthMm",
+    "solderBarrierWidthMm",
 )
 
 

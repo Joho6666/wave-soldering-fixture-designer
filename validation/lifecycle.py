@@ -40,8 +40,10 @@ def append_history(history: list[dict[str, Any]] | None, status: str, time: str 
 
 
 def can_advance(current: str, nxt: str) -> bool:
-    if nxt in {"REJECTED", "APPROVED"}:
+    if nxt == "REJECTED":
         return current in LIFECYCLE_STATES
+    if nxt == "APPROVED":
+        return current in {"VALIDATED", "CNC_TESTED", "ASSEMBLY_TESTED", "WAVE_TESTED"}
     if current not in _ORDER or nxt not in _ORDER:
         return False
     return _ORDER[nxt] >= _ORDER[current]

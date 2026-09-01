@@ -1,13 +1,14 @@
 """Deterministic fixture geometry generator — orchestration only."""
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
 from app.geometry.digest import geometry_digest
-from app.models.geometry import FixtureGeometry, FixtureRegion, PCBGeometry
+from app.models.geometry import DrillHit, FixtureGeometry, FixtureRegion, PCBComponent, PCBGeometry, ThroughHoleComponent
 from app.services.fixture.drc import run_drc
 from app.services.fixture.fixture_body_generator import (
     fixture_body,
@@ -298,15 +299,54 @@ class FixtureGenerator:
         handhold_regions = handholds(combined_sink, params)
         rails, barriers, barrier_mount_holes = rails_and_barriers(body, params)
 
+        transformed_holes: list[DrillHit] = []
+        transformed_components: list[PCBComponent] = []
+        transformed_tht: list[ThroughHoleComponent] = []
+        for inst in panel.pcb_instances:
+            tf = inst.transform
+            for hole in self.pcb.holes or []:
+                hx, hy = tf.apply_xy(hole.x, hole.y)
+                transformed_holes.append(replace(hole, id=f"{hole.id}-{inst.id}", x=hx, y=hy))
+            for comp in self.pcb.components or []:
+                cx, cy = tf.apply_xy(comp.centroid_x, comp.centroid_y)
+                minx, miny, maxx, maxy = comp.bbox
+                x0, y0 = tf.apply_xy(minx, miny)
+                x1, y1 = tf.apply_xy(maxx, maxy)
+                courtyard = tf.apply(comp.courtyard) if comp.courtyard is not None else None
+                transformed_components.append(
+                    replace(
+                        comp,
+                        id=f"{comp.id}-{inst.id}",
+                        centroid_x=cx,
+                        centroid_y=cy,
+                        bbox=(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)),
+                        courtyard=courtyard,
+                    )
+                )
+            for tht in self.pcb.through_hole_components or []:
+                tx, ty = tf.apply_xy(tht.centroid[0], tht.centroid[1])
+                minx, miny, maxx, maxy = tht.bbox
+                x0, y0 = tf.apply_xy(minx, miny)
+                x1, y1 = tf.apply_xy(maxx, maxy)
+                transformed_tht.append(
+                    replace(
+                        tht,
+                        id=f"{tht.id}-{inst.id}",
+                        centroid=(tx, ty),
+                        bbox=(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)),
+                        hole_ids=tuple(f"{hid}-{inst.id}" for hid in tht.hole_ids),
+                    )
+                )
+
         working = PCBGeometry(
             outline=combined_outline,
-            holes=list(self.pcb.holes),
+            holes=transformed_holes,
             layers=list(self.pcb.layers),
             source_sha256=self.pcb.source_sha256,
             geometry_sha256=self.pcb.geometry_sha256,
-            components=list(self.pcb.components or []),
+            components=transformed_components,
             pads=list(self.pcb.pads or []),
-            through_hole_components=list(self.pcb.through_hole_components or []),
+            through_hole_components=transformed_tht,
             semantic_conflicts=list(self.pcb.semantic_conflicts or []),
         )
 

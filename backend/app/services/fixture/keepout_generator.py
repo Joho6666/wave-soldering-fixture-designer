@@ -179,9 +179,7 @@ def _gerber_fallback(
     for i, poly in enumerate(polygons):
         if poly.is_empty or poly.area < 1.0:
             continue
-        # Preserve historical auto-accept for large fallback blobs so existing
-        # jobs without PnP do not suddenly require extra reviews.
-        confidence = 0.90 if poly.area > 5.0 else 0.75
+        confidence = 0.70
         rev_id = f"review-bot-keepout-{i+1}"
         rev_status = _status(review_actions, rev_id, confidence)
         if rev_status != "rejected":

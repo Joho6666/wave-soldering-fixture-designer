@@ -132,7 +132,7 @@ class GeometryComparator:
                     best_dist = dist
                     best_idx = i
 
-            if best_idx >= 0 and best_dist < 50.0:
+            if best_idx >= 0 and best_dist < 8.0:
                 gen_used.add(best_idx)
                 gen = generated[best_idx]
                 results.append(CircleComparisonResult(
