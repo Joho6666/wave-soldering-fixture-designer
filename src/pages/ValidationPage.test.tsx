@@ -4,7 +4,7 @@ import { act } from "react";
 import { ValidationPage } from "./ValidationPage";
 
 describe("ValidationPage", () => {
-  it("renders golden cases from the validation API", async () => {
+  it("renders golden cases and CAD QA chrome", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
       if (url.endsWith("/api/validation/cases")) {
@@ -12,17 +12,24 @@ describe("ValidationPage", () => {
           cases: [{
             caseId: "CASE-001",
             description: "placeholder",
-            status: "awaiting_input",
-            hasInput: false,
+            status: "awaiting_reference",
+            lifecycle: "IMPORTED",
+            kind: "synthetic_demo",
+            hasInput: true,
             hasReferenceDxf: false,
             hasGeneratedDxf: false,
             hasReport: false,
             notes: "no reference",
+            manufacturing: {
+              cnc: { tested: false, result: null },
+              assembly: { tested: false, pcbFit: null },
+              waveSolder: { tested: false, result: null },
+            },
             report: null,
           }],
         }), { status: 200 });
       }
-      return new Response("<svg></svg>", { status: 200, headers: { "Content-Type": "image/svg+xml" } });
+      return new Response("<svg><text>awaiting engineer DXF</text></svg>", { status: 200, headers: { "Content-Type": "image/svg+xml" } });
     });
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -35,6 +42,8 @@ describe("ValidationPage", () => {
     });
     expect(container.textContent).toContain("CASE-001");
     expect(container.textContent).toContain("Golden Cases");
+    expect(container.textContent).toMatch(/Physical Validation/i);
+    expect(container.textContent).toMatch(/awaiting engineer DXF/i);
     root.unmount();
   });
 });

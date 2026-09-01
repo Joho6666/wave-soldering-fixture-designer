@@ -1,0 +1,30 @@
+{
+  "caseId": "CASE-002",
+  "kind": "synthetic_demo",
+  "description": "Same outline+drill ZIP used to exercise missing GBO/GTO/PnP/BOM paths. Not a customer board.",
+  "pcbInput": "input/gerber.zip",
+  "referenceDxf": null,
+  "fixtureParameters": {},
+  "processProfile": {},
+  "expectedFeatures": {},
+  "status": "awaiting_reference",
+  "lifecycle": "GENERATED",
+  "history": [
+    {
+      "status": "IMPORTED",
+      "time": "2026-09-01T00:00:00+00:00"
+    },
+    {
+      "status": "PARSED",
+      "time": "2026-09-01T09:20:48+00:00"
+    },
+    {
+      "status": "GENERATED",
+      "time": "2026-09-01T09:20:48+00:00"
+    }
+  ],
+  "hasReference": false,
+  "engineer": null,
+  "createdAt": "2026-09-01T00:00:00+00:00",
+  "notes": "synthetic_demo. Missing silkscreen and BOM by construction of the source ZIP. awaiting_reference."
+}

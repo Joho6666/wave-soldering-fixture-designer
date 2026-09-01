@@ -1,0 +1,22 @@
+{
+  "caseId": "CASE-004",
+  "status": "awaiting_reference",
+  "overall": "NOT_AVAILABLE",
+  "reason": "engineer reference DXF is missing; metrics are not comparable",
+  "generatedFeatures": {
+    "sinkRegionCount": 1,
+    "keepoutRegionCount": 0,
+    "solderWindowCount": 5,
+    "locatingPinCount": 0,
+    "locatingCandidateCount": 31,
+    "clampCount": 4,
+    "barrierMountHoleCount": 6,
+    "springClipCount": 0,
+    "pressureReliefCount": 0,
+    "panelInstanceCount": 1,
+    "semanticComponentCount": 0,
+    "throughHoleComponentCount": 5
+  },
+  "iou": null,
+  "hausdorffMm": null
+}

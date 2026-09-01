@@ -1,17 +1,30 @@
 {
   "caseId": "CASE-001",
-  "description": "Standard demo board placeholder. Waiting for a real PCB ZIP and an engineer-drawn reference DXF.",
-  "pcbInput": null,
+  "kind": "synthetic_demo",
+  "description": "Synthetic demo board from production_samples. Structure complete; no engineer DXF.",
+  "pcbInput": "input/gerber.zip",
   "referenceDxf": null,
   "fixtureParameters": {},
   "processProfile": {},
-  "expectedFeatures": {
-    "keepoutCount": null,
-    "solderOpeningCount": null,
-    "pinCount": 2
-  },
-  "status": "awaiting_input",
+  "expectedFeatures": {},
+  "status": "awaiting_reference",
+  "lifecycle": "GENERATED",
+  "history": [
+    {
+      "status": "IMPORTED",
+      "time": "2026-09-01T00:00:00+00:00"
+    },
+    {
+      "status": "PARSED",
+      "time": "2026-09-01T09:20:48+00:00"
+    },
+    {
+      "status": "GENERATED",
+      "time": "2026-09-01T09:20:48+00:00"
+    }
+  ],
+  "hasReference": false,
   "engineer": null,
-  "createdAt": "2026-08-31T00:00:00+00:00",
-  "notes": "Do not mark passed. No customer Gerber and no manual reference DXF exist."
+  "createdAt": "2026-09-01T00:00:00+00:00",
+  "notes": "synthetic_demo. No customer Gerber. No engineer reference DXF. Do not mark passed."
 }

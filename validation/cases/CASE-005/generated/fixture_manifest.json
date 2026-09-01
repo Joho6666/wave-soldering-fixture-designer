@@ -1,0 +1,441 @@
+{
+  "softwareVersion": "0.7.0",
+  "algorithmVersion": "fixture-engine-0.7.0",
+  "rulesVersion": "1.3.0",
+  "geometrySha256": "96c65d9e96ce8199f46dab38da7a527687df868c6b7b56ed4e11633631979449",
+  "inputFileSha256": "ad593045913422a5cc22269a82e8162a97a2bf71311821becff2348e739adc33",
+  "dxfOutputSha256": "74daa706797968766fef23c55d124f5eed36111773e66f975accbe70645887a7",
+  "createdAt": "2026-09-01T09:20:49.168435+00:00",
+  "jobId": "CASE-005",
+  "pcb": {
+    "widthMm": 25.654,
+    "heightMm": 48.26,
+    "holeCount": 31,
+    "componentCount": 0
+  },
+  "processProfile": {
+    "palletThicknessMm": 10.0,
+    "fixtureMarginXmm": 20.0,
+    "fixtureMarginYmm": 30.0,
+    "fixtureCornerRadiusMm": 5.0,
+    "minimumMaterialWebMm": 2.0,
+    "fixtureSizeRoundStepMm": 5.0,
+    "sinkClearanceMm": 0.2,
+    "filletRadiusMm": 1.85,
+    "railWidthMm": 5.0,
+    "solderBarrierWidthMm": 10.0,
+    "barrierMountHoleDiameterMm": 3.2,
+    "clampHoleDiameterMm": 3.4,
+    "clampOffsetMm": 10.0,
+    "clampPinClearanceMm": 10.0,
+    "handholdWidthMm": 20.0,
+    "handholdHeightMm": 40.0,
+    "handholdOverlapMm": 1.0,
+    "handholdCornerRadiusMm": 2.0,
+    "springClipRadiusMm": 2.45,
+    "keepoutClearanceMm": 0.7,
+    "keepoutInnerFilletMm": 1.5,
+    "componentVerticalClearanceMm": 0.5,
+    "pocketFloorThicknessMm": 2.0,
+    "defaultPocketDepthMm": 2.0,
+    "solderClearanceMm": 3.0,
+    "solderMinOuterDiameterMm": 3.0,
+    "solderMinOpeningWidthMm": 1.5,
+    "solderOpeningMergeDistanceMm": 2.0,
+    "directionalOpeningEnabled": false,
+    "solderLeadingExtensionMm": 0.8,
+    "solderTrailingExtensionMm": 1.5,
+    "solderSideClearanceMm": 0.0,
+    "solderEntryChamferMm": 0.0,
+    "solderExitChamferMm": 0.0,
+    "minPinHoleDiameterMm": 2.0,
+    "maxPinHoleDiameterMm": 4.5,
+    "preferredPinDiameterMinMm": 2.5,
+    "preferredPinDiameterMaxMm": 4.5,
+    "preferredNPTH": true,
+    "minPinSeparationMm": 15.0,
+    "pinEdgeBonusMm": 15.0,
+    "pinDiameterOffsetMm": 0.1,
+    "pinDiameterMinMm": 1.5,
+    "pinDiameterMaxMm": 4.0,
+    "waveDirection": "+X",
+    "conveyorDirection": "+X",
+    "pressureReliefEnabled": false,
+    "pressureReliefMinPocketAreaMm2": 400.0,
+    "pressureReliefChannelWidthMm": 2.0,
+    "pressureReliefEdgeClearanceMm": 3.0,
+    "panelEnabled": false,
+    "panelRows": 1.0,
+    "panelCols": 1.0,
+    "panelBoardSpacingMm": 2.0,
+    "panelOuterMarginMm": 5.0,
+    "panelToolingHoleDiameterMm": 3.0,
+    "panelFiducialDiameterMm": 1.0,
+    "camReservedToolDiameterMm": 1.85
+  },
+  "generatedFeatures": {
+    "sinkRegionCount": 1,
+    "keepoutRegionCount": 0,
+    "solderWindowCount": 5,
+    "locatingPinCount": 0,
+    "locatingCandidateCount": 31,
+    "clampCount": 4,
+    "barrierMountHoleCount": 6,
+    "springClipCount": 0,
+    "pressureReliefCount": 0,
+    "panelInstanceCount": 1,
+    "semanticComponentCount": 0,
+    "throughHoleComponentCount": 5
+  },
+  "drcResults": [
+    {
+      "id": "drc-locating_pins_insufficient-global",
+      "code": "LOCATING_PINS_INSUFFICIENT",
+      "type": "LOCATING_PINS_INSUFFICIENT",
+      "title": "定位销数量不足",
+      "description": "当前仅配置 0 个定位销，推荐至少 2 个以保证 PCB 约束定位。",
+      "message": "当前仅配置 0 个定位销，推荐至少 2 个以保证 PCB 约束定位。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "个",
+      "target": null,
+      "geometry": null,
+      "sourceIds": [],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-1-sink-edge",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口与沉板边缘材料壁厚过薄",
+      "description": "上锡窗口 #1 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #1 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          -2.2605000000000004,
+          7.772740908758966,
+          9.4485,
+          38.40425909124103
+        ],
+        "area": 278.89953962010327
+      },
+      "sourceIds": [
+        "solder-1"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web-web-solder-1",
+      "code": "MINIMUM_MATERIAL_WEB",
+      "type": "MINIMUM_MATERIAL_WEB",
+      "title": "最小材料壁厚不足",
+      "description": "上锡窗口 #1 距沉板边缘 0.00mm < 2.0mm。",
+      "message": "上锡窗口 #1 距沉板边缘 0.00mm < 2.0mm。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          -2.2605000000000004,
+          7.772740908758966,
+          9.4485,
+          38.40425909124103
+        ],
+        "area": 278.89953962010327
+      },
+      "sourceIds": [
+        "solder-1"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-3-sink-edge",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口与沉板边缘材料壁厚过薄",
+      "description": "上锡窗口 #3 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #3 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          20.599500000000003,
+          28.0925,
+          27.9145,
+          45.5675
+        ],
+        "area": 127.79508693962183
+      },
+      "sourceIds": [
+        "solder-3"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web-web-solder-3",
+      "code": "MINIMUM_MATERIAL_WEB",
+      "type": "MINIMUM_MATERIAL_WEB",
+      "title": "最小材料壁厚不足",
+      "description": "上锡窗口 #3 距沉板边缘 0.00mm < 2.0mm。",
+      "message": "上锡窗口 #3 距沉板边缘 0.00mm < 2.0mm。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          20.599500000000003,
+          28.0925,
+          27.9145,
+          45.5675
+        ],
+        "area": 127.79508693962183
+      },
+      "sourceIds": [
+        "solder-3"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-4-sink-edge",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口与沉板边缘材料壁厚过薄",
+      "description": "上锡窗口 #4 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #4 距离沉板台阶边缘仅 0.00mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          20.599500000000003,
+          2.6924999999999994,
+          27.9145,
+          20.1675
+        ],
+        "area": 127.7950869396218
+      },
+      "sourceIds": [
+        "solder-4"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web-web-solder-4",
+      "code": "MINIMUM_MATERIAL_WEB",
+      "type": "MINIMUM_MATERIAL_WEB",
+      "title": "最小材料壁厚不足",
+      "description": "上锡窗口 #4 距沉板边缘 0.00mm < 2.0mm。",
+      "message": "上锡窗口 #4 距沉板边缘 0.00mm < 2.0mm。",
+      "severity": "warning",
+      "currentValue": 0.0,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          20.599500000000003,
+          2.6924999999999994,
+          27.9145,
+          20.1675
+        ],
+        "area": 127.7950869396218
+      },
+      "sourceIds": [
+        "solder-4"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-5-sink-edge",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口与沉板边缘材料壁厚过薄",
+      "description": "上锡窗口 #5 距离沉板台阶边缘仅 1.11mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #5 距离沉板台阶边缘仅 1.11mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 1.1144999999999925,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          5.3595,
+          37.4905,
+          20.2945,
+          47.34550000000001
+        ],
+        "area": 147.14988693962192
+      },
+      "sourceIds": [
+        "solder-5"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web-web-solder-5",
+      "code": "MINIMUM_MATERIAL_WEB",
+      "type": "MINIMUM_MATERIAL_WEB",
+      "title": "最小材料壁厚不足",
+      "description": "上锡窗口 #5 距沉板边缘 1.11mm < 2.0mm。",
+      "message": "上锡窗口 #5 距沉板边缘 1.11mm < 2.0mm。",
+      "severity": "warning",
+      "currentValue": 1.1144999999999925,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": {
+        "bounds": [
+          5.3595,
+          37.4905,
+          20.2945,
+          47.34550000000001
+        ],
+        "area": 147.14988693962192
+      },
+      "sourceIds": [
+        "solder-5"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-web-1-2",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口间材料壁厚过薄",
+      "description": "上锡窗口 #1 与窗口 #2 间壁厚仅 1.70mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #1 与窗口 #2 间壁厚仅 1.70mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 1.695833465303938,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": null,
+      "sourceIds": [
+        "solder-1",
+        "solder-2"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    },
+    {
+      "id": "drc-minimum_material_web_too_small-solder-web-3-5",
+      "code": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "type": "MINIMUM_MATERIAL_WEB_TOO_SMALL",
+      "title": "上锡窗口间材料壁厚过薄",
+      "description": "上锡窗口 #3 与窗口 #5 间壁厚仅 0.31mm (要求 >= 2.0mm)。",
+      "message": "上锡窗口 #3 与窗口 #5 间壁厚仅 0.31mm (要求 >= 2.0mm)。",
+      "severity": "warning",
+      "currentValue": 0.30500000000000327,
+      "requiredValue": 2.0,
+      "unit": "mm",
+      "target": null,
+      "geometry": null,
+      "sourceIds": [
+        "solder-3",
+        "solder-5"
+      ],
+      "recommendedAction": null,
+      "confirmed": false
+    }
+  ],
+  "engineerReviews": [
+    {
+      "id": "review-locating-pins",
+      "type": "locating_pin_candidate",
+      "status": "pending",
+      "title": "定位销数量或置信度待确认",
+      "description": "已识别 0 个高置信度定位孔，请在 CAD 视图中确认定位孔选择。",
+      "confidence": 0.3,
+      "mandatory": true,
+      "data": {
+        "candidates": [
+          "pin-cand-drill-layer--1",
+          "pin-cand-drill-layer--2",
+          "pin-cand-drill-layer--3",
+          "pin-cand-drill-layer--4",
+          "pin-cand-drill-layer--5",
+          "pin-cand-drill-layer--6"
+        ]
+      }
+    },
+    {
+      "id": "review-bot-keepout-missing-layer",
+      "type": "CONFIRM_NO_BOTTOM_SMD",
+      "status": "pending",
+      "title": "缺少 BOT 层数据 - 请确认本板无 BOT 贴片",
+      "description": "未检测到底层丝印 (GBO) 或阻焊 (GBS) 层。若本板确实无 BOT 贴片元件，请确认放行；否则请重新指定图层。",
+      "confidence": 0.4,
+      "mandatory": true
+    },
+    {
+      "id": "review-top-solder-1",
+      "type": "top_solder_region",
+      "status": "pending",
+      "title": "TOP 插件上锡窗口 #1 确认",
+      "description": "语义识别 connector（12 pins），波峰焊透锡窗口已预留 3.0mm 间距。",
+      "confidence": 0.72,
+      "geometryId": "review-top-solder-1",
+      "mandatory": false,
+      "x": 6.096,
+      "y": 28.829,
+      "sourceType": "semantic_component",
+      "sourceIds": [
+        "tht-1"
+      ]
+    },
+    {
+      "id": "review-top-solder-2",
+      "type": "top_solder_region",
+      "status": "pending",
+      "title": "TOP 插件上锡窗口 #2 确认",
+      "description": "语义识别 unknown（1 pins），波峰焊透锡窗口已预留 3.0mm 间距。",
+      "confidence": 0.7,
+      "geometryId": "review-top-solder-2",
+      "mandatory": false,
+      "x": 14.097,
+      "y": 35.052,
+      "sourceType": "semantic_component",
+      "sourceIds": [
+        "tht-2"
+      ]
+    },
+    {
+      "id": "review-spring-clip-no-gto",
+      "type": "CONFIRM_NO_SPRING_CLIP_REQUIRED",
+      "status": "pending",
+      "title": "缺少 GTO 层 - 请确认无需弹簧卡安装孔",
+      "description": "未检测到顶层丝印 (GTO) 数据。若本板无需前挡板弹簧卡安装孔，请确认放行；否则请重新指定 GTO 图层。",
+      "confidence": 0.3,
+      "mandatory": true
+    }
+  ],
+  "overrides": [],
+  "validationStatus": "awaiting_reference",
+  "layerMappingConfirmed": true,
+  "panel": null,
+  "status": "review_required"
+}

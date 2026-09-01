@@ -48,7 +48,7 @@ def test_fixture_outline_scores_both_panel_islands():
     manual = ManualFixtureData(fixture_outline=[left, right])
     generated = {"fixture_outline": left.union(right)}
     verdict = compare_fixture(manual, generated, "CASE-PANEL-ISLANDS")
-    outline = next(f for f in verdict.features if f.name == "fixture_outline")
+    outline = next(f for f in verdict.features if f.name == "fixture_body")
     assert outline.status == "PASS"
     assert outline.iou is not None and outline.iou > 0.99
 

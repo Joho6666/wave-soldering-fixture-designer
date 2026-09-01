@@ -1,0 +1,21 @@
+{
+  "caseId": "CASE-001",
+  "cnc": {
+    "tested": false,
+    "material": null,
+    "thicknessMm": null,
+    "toolDiameterMm": null,
+    "result": null
+  },
+  "assembly": {
+    "tested": false,
+    "pcbFit": null,
+    "pinFit": null,
+    "componentCollision": null
+  },
+  "waveSolder": {
+    "tested": false,
+    "result": null
+  },
+  "issues": []
+}

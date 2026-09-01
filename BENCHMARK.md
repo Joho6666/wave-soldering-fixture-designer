@@ -1,19 +1,17 @@
 # BENCHMARK.md
 
 日期: 2026-09-01  
-命令: `backend/.venv/Scripts/python.exe scripts/benchmark_fixture.py`  
-机器: Windows 10, 本地开发机。数字是这一次实测，不是估计。
+命令: `python scripts/benchmark_fixture.py`
 
-当前仓库里没有真正的“大客户 Gerber”。所谓 small / medium / large 只是仓库里现有的三个 ZIP，几何规模接近，不能代表生产现场的大型拼板。
+仓库里没有真正的大客户 Gerber。`small` / `medium` / `large_zip_not_large_geometry` 是现有 ZIP，几何规模接近，**不能**代表生产现场。`large_synthetic` 和 `large_panel_synthetic` 用 PTH/拼板实例数定义规模，并标明 `synthetic_scale`。
 
-| 样本 | parse ms | semantic ms | fixture generation ms | DRC ms | DXF export ms | solder windows |
-|---|---:|---:|---:|---:|---:|---:|
-| small (`wave_fixture_outline_drill.zip`) | 44.23 | 2.77 | 26.41 | 6.82 | 107.34 | 5 |
-| medium (`case_001_standard_demo`) | 9.24 | 2.24 | 29.72 | 6.93 | 97.28 | 5 |
-| large (`CASE-004_x2_nonstandard_names.zip`) | 9.57 | 0.58 | 15.68 | 4.88 | 110.12 | 5 |
+要得到可引用的毫秒数，请在目标机器上重跑脚本并把输出贴到这里。本文件不编造一次未保存的数字。
 
-观察:
+规模定义：
 
-- 生成与 DRC 都在数十毫秒量级；DXF 写出约占全程大部分时间。
-- keepout/solder DRC 已改用 STRtree 做包围盒预筛，再 `intersects`。现有样本窗口数量很少，看不出数量级差异。
-- 没有对上千个开窗的真实客户板做 profiling。下一轮需要真正的 large PCB。
+- Small PCB: 现有 outline+drill demo
+- Medium PCB: 同一 demo（文件不同路径，几何同类）
+- Large PCB: 合成高 PTH 数，不是文件变大
+- Large Panel: 3×3 grid of a small board
+
+**NOT PRODUCTION READY**

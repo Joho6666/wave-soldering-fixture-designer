@@ -37,15 +37,16 @@ def test_identical_fixture_is_pass(tmp_path: Path):
     }
     verdict = compare_fixture(manual, generated, "CASE-SYN")
     assert verdict.overall == "PASS"
-    assert {f.name: f.status for f in verdict.features}["fixture_outline"] == "PASS"
+    assert {f.name: f.status for f in verdict.features}["fixture_body"] == "PASS"
     write_reports(verdict, tmp_path)
     assert (tmp_path / "validation_report.json").exists()
     assert (tmp_path / "validation_report.md").exists()
     data = json.loads((tmp_path / "validation_report.json").read_text(encoding="utf-8"))
     assert data["overall"] == "PASS"
     svg = overlay_svg(manual, generated)
-    assert "generated-only" in svg
-    assert "reference-only" in svg
+    assert 'id="generated"' in svg
+    assert 'id="reference"' in svg
+    assert 'id="difference"' in svg
 
 
 def test_shifted_window_is_not_pass():
@@ -58,7 +59,7 @@ def test_shifted_window_is_not_pass():
         "solder_windows": [box(60, 50, 90, 70)],
     }
     verdict = compare_fixture(manual, generated, "CASE-SHIFT")
-    solder = next(f for f in verdict.features if f.name == "solder_windows")
+    solder = next(f for f in verdict.features if f.name == "solder_openings")
     assert solder.status in {"FAIL", "WARNING"}
     assert verdict.overall in {"FAIL", "WARNING"}
 
@@ -67,7 +68,7 @@ def test_case_001_is_awaiting_real_reference():
     cases = list_cases()
     case = next(c for c in cases if c["caseId"] == "CASE-001")
     assert case["hasReferenceDxf"] is False
-    assert case["status"] in {"awaiting_input", "awaiting_reference_dxf"}
+    assert case["status"] in {"awaiting_input", "awaiting_reference", "awaiting_reference_dxf"}
     root = Path(__file__).resolve().parents[2] / "validation" / "cases" / "CASE-001"
     loaded = load_case_json(root)
     assert infer_status(root, loaded.get("status")) != "passed"
